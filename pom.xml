@@ -6,9 +6,9 @@
 >
   <modelVersion>4.0.0</modelVersion>
   <groupId>ianmarshall</groupId>
-  <artifactId>SchwarzschildSimulatedAnnealing</artifactId>
+  <artifactId>BigBangSimulatedAnnealing</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>Program to obtain the Schwarzschild metric numerically using a simulated annealing algorithm</name>
+  <name>Program to obtain the BigBang metric numerically using a simulated annealing algorithm</name>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -98,7 +98,7 @@
 					<transformers>
 						<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
 							<manifestEntries>
-								<Main-Class>ianmarshall.SchwarzschildSimulatedAnnealing</Main-Class>
+								<Main-Class>ianmarshall.BigBangSimulatedAnnealing</Main-Class>
                 <Multi-Release>true</Multi-Release>
 							</manifestEntries>
 						</transformer>

@@ -82,7 +82,7 @@ public class StartParameters
 		 + "%n[%10$s] is the divisor to be used when calculating the annealing temperature."
 		 + " This must be greater than zero."
 		 + "%n",
-		 SchwarzschildSimulatedAnnealing.class.getSimpleName(),
+		 BigBangSimulatedAnnealing.class.getSimpleName(),
 		 S_ARG_NAME_NUMBER_OF_RUNS,                      S_ARG_DATA_TYPE_NUMBER_OF_RUNS,
 		 S_ARG_NAME_NEIGHBOUR_PEAK_SCALING_FACTOR,       S_ARG_DATA_TYPE_NEIGHBOUR_PEAK_SCALING_FACTOR,
 		 S_ARG_NAME_ACCEPTANCE_PROBILITY_SCALING_FACTOR, S_ARG_DATA_TYPE_ACCEPTANCE_PROBILITY_SCALING_FACTOR,

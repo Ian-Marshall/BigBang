@@ -16,9 +16,6 @@ Big Bang development notes
 //
 //
 
-BigBang
-
-Program to obtain numerically the space-time metric of a Universe emerging from an exploding black hole, using a simulated annealing algorithm
 
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -31,7 +28,7 @@ Program to obtain numerically the space-time metric of a Universe emerging from 
 
 Done    Task
 ----    ----
-
+Yes     Rename instances of 'Schwarzschild[...]' to 'BigBang[...]'.
 
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +70,7 @@ dir /og-d nbactions.xml;"notes\Big Bang software development notes.txt";src\main
 
 pom.xml
 log4j2.xml
-SchwarzschildSimulatedAnnealing
+BigBangSimulatedAnnealing
 StartParameters
 Supervisor
 MetricComponents

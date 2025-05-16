@@ -1,10 +1,11 @@
-# Schwarzschild
+# Big Bang
 
-This is a program to obtain a Schwarzschild solution numerically using a simulated annealing algorithm.
+This is a program to obtain numerically the space-time metric of a Universe emerging from an exploding black hole,
+using a simulated annealing algorithm.
 
-## How to Build and Run
+## How to build and run
 
-### **Using the Run Script**
+### **Using the run script**
 To build and run the project, use the provided bash script:
 
 ```sh

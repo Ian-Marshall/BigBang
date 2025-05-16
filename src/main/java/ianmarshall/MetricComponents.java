@@ -7,7 +7,7 @@ import java.util.Map.Entry;
 
 /**
  * This class represents elements of the metric or fundamental tensor at a point in space-time.
- * For the Schwarzschild approximation, this point in space-time is given by the radius only.
+ * For the BigBang approximation, this point in space-time is given by the radius only.
  */
 public class MetricComponents implements Cloneable
 {

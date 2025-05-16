@@ -122,7 +122,7 @@ public class Worker implements Runnable
 	public void stopExecution()
 	{
 		m_bStopping = true;
-		logger.info(String.format("Stopping run number %s...", SchwarzschildSimulatedAnnealing.formatInteger(m_nRun)));
+		logger.info(String.format("Stopping run number %s...", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
 	}
 
 	/**
@@ -153,7 +153,7 @@ public class Worker implements Runnable
 		while ((!m_bStopping) && (m_nRun < m_nRuns))
 		{
 			m_nRun++;
-	 // logger.info(String.format("Started run number %s.", SchwarzschildSimulatedAnnealing.formatInteger(m_nRun)));
+	 // logger.info(String.format("Started run number %s.", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
 
 			if (m_bFirstRun)
 			{
@@ -193,7 +193,7 @@ public class Worker implements Runnable
 		 // {
 					sLogEntry = String.format("Run number %s:"
 					 + "    ***  Accepted move from energy %f to %f at temperature %f with probability %.5f.  ***",
-					 SchwarzschildSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent, dblEnergyNew, dblTemperature,
+					 BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent, dblEnergyNew, dblTemperature,
 					 dblProbability);
 
 					int nStartLength = s_sbMoveLog.length();
@@ -219,24 +219,24 @@ public class Worker implements Runnable
 			{
 				sLogEntry = String.format("Run number %s:"
 				 + " rejected move from energy %f to %f with probability %.5f.",
-				 SchwarzschildSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent, dblEnergyNew, dblProbability);
+				 BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent, dblEnergyNew, dblProbability);
 
 		 // sLogEntry = String.format("%n***  Remove the setting of bAcceptMove to false.  ***");
 			}
 
 			if (sLogEntry == null)
 				sLogEntry = String.format("Run number %s: (pre-move) energy = %f.",
-				 SchwarzschildSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent);
+				 BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent);
 
 			if (sLogEntry != null)
 			{
 				logger.info(sLogEntry);
 		 // logger.info(String.format("Completed run number %s with current energy %f.",
-		 //  SchwarzschildSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent));
+		 //  BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent));
 			}
 
 	 // logger.info(String.format("Completed run number %s with current energy %f.",
-	 //  SchwarzschildSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent));
+	 //  BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent));
 		}
 
 		logger.info(String.format("Move log is:%n%s", s_sbMoveLog));

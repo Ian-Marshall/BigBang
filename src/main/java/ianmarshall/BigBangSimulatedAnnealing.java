@@ -9,9 +9,9 @@ import java.util.Collections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class SchwarzschildSimulatedAnnealing
+public class BigBangSimulatedAnnealing
 {
-	private static final Logger logger = LoggerFactory.getLogger(SchwarzschildSimulatedAnnealing.class);
+	private static final Logger logger = LoggerFactory.getLogger(BigBangSimulatedAnnealing.class);
 	private static final DecimalFormat s_dfInteger;
 	private static final DecimalFormat s_dfFloat;
 
@@ -25,14 +25,14 @@ public class SchwarzschildSimulatedAnnealing
 		s_dfFloat.setMinimumFractionDigits(1);
 	}
 
-	public SchwarzschildSimulatedAnnealing()
+	public BigBangSimulatedAnnealing()
 	{
 	}
 
 	public static void main(String[] asArgs) throws IOException
 	{
-		SchwarzschildSimulatedAnnealing ssa = new SchwarzschildSimulatedAnnealing();
-		ssa.execute(asArgs);
+		BigBangSimulatedAnnealing bbsa = new BigBangSimulatedAnnealing();
+		bbsa.execute(asArgs);
 	}
 
 	private void execute(String[] asArgs) throws IOException

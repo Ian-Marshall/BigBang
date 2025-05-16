@@ -11,7 +11,7 @@ logSuffix="${numberOfRuns}-${neighbourPeakScalingFactor}-${acceptanceProbability
 
 mvn clean package
 
-java -DlogSuffix="$logSuffix" -jar target/SchwarzschildSimulatedAnnealing-1.0-SNAPSHOT-shaded.jar \
+java -DlogSuffix="$logSuffix" -jar target/BigBangSimulatedAnnealing-1.0-SNAPSHOT-shaded.jar \
     numberOfRuns "$numberOfRuns" \
     neighbourPeakScalingFactor "$neighbourPeakScalingFactor" \
     acceptanceProbabilityScalingFactor "$acceptanceProbabilityScalingFactor" \
