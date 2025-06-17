@@ -6,14 +6,23 @@ import java.util.List;
 import java.util.Map.Entry;
 
 /**
- * This class represents elements of the metric or fundamental tensor at a point in space-time.
- * For the BigBang approximation, this point in space-time is given by the radius only.
+ * This class represents an element of the metric or fundamental tensor at a point in space-time.
+ * For the Big Bang approximation, this point in space-time is given by the radius and time.
  */
-public class MetricComponents implements Cloneable
+public class MetricComponents
 {
+	/**
+	 * This is private until it is used outside this class.
+	 * It is used to identify the position of a <code>MetricComponent</code> in the metric tensor.
+	*/
+	private enum MetricPosition
+	{
+		R, T
+	}
+
 	public enum MetricComponent
 	{
-		A, B
+		A, B, D
 	}
 
 	/**
@@ -22,28 +31,22 @@ public class MetricComponents implements Cloneable
 	 */
 	public enum RicciTensor
 	{
-		R00, R11, R22
+		R00, R01, R11, R22
 	}
 
-	private double m_R = 0.0;    // The radius co-ordinate of the metric.
-	private double m_A = 0.0;    // } The component values
-	private double m_B = 0.0;    // } of the metric.
+	private double m_R = 0.0;    // The radius co-ordinate of the metric
+	private double m_T = 0.0;    // The time co-ordinate of the metric
+	private double m_A = 0.0;    // }
+	private double m_B = 0.0;    // } The component values of the metric
+	private double m_D = 0.0;    // }
 
-	public MetricComponents(double r, double a, double b)
+	public MetricComponents(double r, double t, double a, double b, double d)
 	{
 		m_R = r;
+		m_T = t;
 		m_A = a;
 		m_B = b;
-	}
-
-	@Override
-	public MetricComponents clone() throws CloneNotSupportedException
-	{
-		MetricComponents mcResult = (MetricComponents)super.clone();
-		mcResult.setR(getR());
-		mcResult.setA(getA());
-		mcResult.setB(getB());
-		return mcResult;
+		m_D = d;
 	}
 
 	public double getR()
@@ -54,6 +57,16 @@ public class MetricComponents implements Cloneable
 	public void setR(double r)
 	{
 		m_R = r;
+	}
+
+	public double getT()
+	{
+		return m_T;
+	}
+
+	public void setT(double t)
+	{
+		m_T = t;
 	}
 
 	public double getA()
@@ -76,6 +89,16 @@ public class MetricComponents implements Cloneable
 		m_B = b;
 	}
 
+	public double getD()
+	{
+		return m_D;
+	}
+
+	public void setD(double d)
+	{
+		m_D = d;
+	}
+
 	public Entry<Double, Double> getComponent(MetricComponent mc)
 	{
 		double dbl = 0.0;
@@ -87,6 +110,9 @@ public class MetricComponents implements Cloneable
 					break;
 				case B:
 					dbl = getB();
+					break;
+				case D:
+					dbl = getD();
 					break;
 				default:
 					throw new IllegalArgumentException(String.format("Metric component \"%s\" not found.", mc.toString()));
@@ -106,15 +132,23 @@ public class MetricComponents implements Cloneable
 			case B:
 				setB(dbl);
 				break;
+			case D:
+				setD(dbl);
+				break;
 			default:
 				throw new IllegalArgumentException(String.format("Metric component \"%s\" not found.", mc.toString()));
 		}
 	}
 
+	public MetricComponents copy()
+	{
+		return new MetricComponents(getR(), getT(), getA(), getB(), getD());
+	}
+
 	/**
 	 * Make a deep copy of a list of <code>MetricComponents</code>.
 	 * @param liG
-	 *   The list of <codeMetricComponents</code> to be copied.
+	 *   The list of <code>MetricComponents</code> to be copied.
 	 *   If this is <code>null</code> then an empty list will be returned.
 	 * @return
 	 *   A deep copy of the list supplied.
@@ -124,20 +158,11 @@ public class MetricComponents implements Cloneable
 		int nSize = liG != null ? liG.size() : 0;
 		List<MetricComponents> liResult = new ArrayList<>(nSize);
 
-		if ((liG != null) && !liG.isEmpty())
+		if (nSize > 0)
 			for (MetricComponents mc: liG)
 			{
-				MetricComponents mcNew;
-				try
-				{
-					mcNew = mc.clone();
-				}
-				catch (CloneNotSupportedException e)
-				{
-					throw new RuntimeException(e);    // This should never happen
-				}
-
-				liResult.add(mcNew);
+				MetricComponents mcCopy = mc.copy();
+				liResult.add(mcCopy);
 			}
 
 		return liResult;

@@ -8,7 +8,8 @@
   <groupId>ianmarshall</groupId>
   <artifactId>BigBangSimulatedAnnealing</artifactId>
   <version>1.0-SNAPSHOT</version>
-  <name>Program to obtain the BigBang metric numerically using a simulated annealing algorithm</name>
+  <name>BigBangSimulatedAnnealing</name>
+  <description>Program to obtain the BigBang metric numerically using a simulated annealing algorithm</description>
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

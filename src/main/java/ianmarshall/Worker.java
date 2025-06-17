@@ -20,51 +20,6 @@ import org.slf4j.LoggerFactory;
 
 public class Worker implements Runnable
 {
-	public enum DerivativeLevel
-	{
-		None, First, Second;
-
-		public DerivativeLevel getDiffential()
-		{
-			DerivativeLevel dlResult = None;
-
-			switch (this)
-			{
-				case None:
-					dlResult = First;
-					break;
-				case First:
-					dlResult = Second;
-					break;
-				case Second:
-				default:
-					throw new RuntimeException("Invalid derivative level.");
-			}
-
-			return dlResult;
-		};
-
-		public DerivativeLevel getIntegral()
-		{
-			DerivativeLevel dlResult = None;
-
-			switch (this)
-			{
-				case First:
-					dlResult = None;
-					break;
-				case Second:
-					dlResult = First;
-					break;
-				case None:
-				default:
-					throw new RuntimeException("Invalid derivative level.");
-			}
-
-			return dlResult;
-		};
-	}
-
 	public class WorkerUncaughtExceptionHandler implements UncaughtExceptionHandler
 	{
 		public WorkerUncaughtExceptionHandler()
@@ -86,10 +41,15 @@ public class Worker implements Runnable
 	private int m_nRun = 0;
 	private int m_nRuns = 0;
 
+
 	// These are tensor values, with metric components for each value of radius
 	private List<MetricComponents> m_liG = null;
 	private List<MetricComponents> m_liGFirstDerivative = null;
 	private List<MetricComponents> m_liGSecondDerivative = null;
+
+	// These hold the values of the metric tensor, which store metric components for each value of radius and time
+	private MetricComponents m_mcxG = null;
+
 
 	private boolean m_bFirstRun = true;    // This will also be true when resuming running after a pause
 	private volatile boolean m_bStopping = false;
@@ -269,11 +229,15 @@ public class Worker implements Runnable
 		String sIndent = " ".repeat(72);
 
 		sbLog.append(String.format(
-			 "%n%1$sindex                   R                   A                   B"
-		 + "%n%1$s-----  ------------------  ------------------  ------------------",
+			 "%n%1$sindex                   T                   R                   A                   B                   D"
+		 + "%n%1$s-----  ------------------  ------------------  ------------------  ------------------  ------------------",
 		 sIndent));
 
-		String sFormat = "%n" + sIndent + "%5d  %,18.12f  %,18.12f  %,18.12f";
+		String sFormat = "%n" + sIndent + "%5d  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f";
+
+		final double DBL_T_MIN = 0.00;
+		final double DBL_T_MAX = 100.0;
+		final double DBL_STEP_TIME = 1.0;
 
 		final double DBL_R_MIN = 1.01;
 		final double DBL_R_MAX = 100.0;
@@ -288,11 +252,10 @@ public class Worker implements Runnable
 			if (bOneMoreLoop)
 				bLoop = false;
 
-	 // double dblA =  1.0 * (1.0 - (1.0 / dblR));
-	 // double dblB =  1.0 * (-1.0 / (1.0 - (1.0 / dblR)));
 			double dblA =  1.0;
 			double dblB =  -1.0;
 
+	 // public MetricComponents(double r, double t, double a, double b, double d)
 			m_liG.add(new MetricComponents(dblR, dblA, dblB));
 			m_liGFirstDerivative.add(new MetricComponents(dblR, 0.0, 0.0));
 			m_liGSecondDerivative.add(new MetricComponents(dblR, 0.0, 0.0));
