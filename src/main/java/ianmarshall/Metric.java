@@ -1,49 +1,55 @@
 package ianmarshall;
 
+import java.util.List;
+
 /**
  * This class represents all the elements of the metric or fundamental tensor at all the points in space-time
  * under consideration.
  */
 public class Metric
 {
-	public enum DerivativeLevel
+	private final int m_nRadiusElements;
+	private final int m_nTimeElements;
+	private final MetricComponents[][] m_aMetricComponents;    // 1st dimension: radius; 2nd dimension: time
+
+	private Metric(int nRadiusElements, int nTimeElements, MetricComponents[][] aMetricComponents)
 	{
-		None, FirstTime, FirstRadius, SecondTime, SecondRadius, FirstTimeFirstRadius;
+		m_nRadiusElements = nRadiusElements;
+		m_nTimeElements = nTimeElements;
+		m_aMetricComponents = new MetricComponents[m_nRadiusElements][m_nTimeElements];
+
+		for (int r = 0; r < m_nRadiusElements; r++)
+			for (int t = 0; t < m_nTimeElements; t++)
+				m_aMetricComponents[r][t] = aMetricComponents[r][t].copy();
 	}
 
-	private static final int S_N_ELEMENTS_RADIUS = 1000;
-	private static final int S_N_ELEMENTS_TIME = 1000;
-	private MetricComponents[][] m_aMetricComponents = null;    // 1st dimension: radius; 2nd dimension: time
-
-	public Metric()
+	public Metric(List<Double> liRadii, List<Double> liTimes)
 	{
-		m_aMetricComponents = new MetricComponents[S_N_ELEMENTS_RADIUS][S_N_ELEMENTS_TIME];
+		m_nRadiusElements = liRadii.size();
+		m_nTimeElements = liTimes.size();
+		m_aMetricComponents = new MetricComponents[m_nRadiusElements][m_nTimeElements];
+
+		for (int r = 0; r < m_nRadiusElements; r++)
+		{
+			double dblRadius = liRadii.get(r);
+
+			for (int t = 0; t < m_nTimeElements; t++)
+				m_aMetricComponents[r][t] = new MetricComponents(dblRadius, liTimes.get(t), 0.0, 0.0, 0.0);
+		}
 	}
 
-	/**
-	* Make this method public when it is needed outside this class.
-	*/
-	private void zeroMetricComponents()
+	public Metric copy()
 	{
-		for (int r = 0; r < S_N_ELEMENTS_RADIUS; r++)
-			for (int t = 0; t < S_N_ELEMENTS_TIME; t++)
-				m_aMetricComponents[r][t] = new MetricComponents(0.0, 0.0, 0.0, 0.0, 0.0);
-	}
-
-	/**
-	* Make this method public when it is needed outside this class.
-	*/
-	private Metric deepCopy()
-	{
-		Metric mResult = new Metric();
-
-		for (int r = 0; r < S_N_ELEMENTS_RADIUS; r++)
-			for (int t = 0; t < S_N_ELEMENTS_TIME; t++)
-			{
-				MetricComponents mc = m_aMetricComponents[r][t];
-				mResult.m_aMetricComponents[r][t] = mc.copy();
-			}
-
+		Metric mResult = new Metric(m_nRadiusElements, m_nTimeElements, m_aMetricComponents);
 		return mResult;
+	}
+
+	public MetricComponents getMetricComponents(int nRIndex, int nTIndex)
+	{
+		if ((nRIndex < 0) || (nRIndex >= m_nRadiusElements) || (nTIndex < 0) || (nTIndex >= m_nTimeElements))
+			throw new IndexOutOfBoundsException(String.format(
+			 "At least one invalid metric component index: (nRIndex = %d, nTIndex = %d)", nRIndex, nTIndex));
+
+		return m_aMetricComponents[nRIndex][nTIndex];
 	}
 }

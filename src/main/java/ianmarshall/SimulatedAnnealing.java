@@ -102,9 +102,9 @@ public class SimulatedAnnealing
 				nFinish = nStart + 1;
 			}
 
-			Entry<Double, Double> entry = Worker.getMetricComponentOfDerivativeLevel(liG, null, null, None, nStart, A);
+			Entry<Double, Double> entry = Worker.getMetricComponent(liG, null, null, None, nStart, A);
 			double dblRStart = entry.getKey().doubleValue();
-			entry = Worker.getMetricComponentOfDerivativeLevel(liG, null, null, None, nFinish, A);
+			entry = Worker.getMetricComponent(liG, null, null, None, nFinish, A);
 			double dblRFinish = entry.getKey().doubleValue();
 
 			dblSumOfSquaresOfRicciTensorsOverAllR +=
@@ -151,9 +151,9 @@ public class SimulatedAnnealing
 			double dblExponent = (i - nIndexCentre) / dblStandardDeviation;
 			double dblDelta = dblDeltaPeak * Math.exp(-dblExponent * dblExponent);
 
-			double dblMC = Worker.getMetricComponentOfDerivativeLevel(liGResult, null, null, None, i, mc)
+			double dblMC = Worker.getMetricComponent(liGResult, null, null, None, i, mc)
 			 .getValue().doubleValue();
-			Worker.setMetricComponentOfDerivativeLevel(liGResult, null, null, None, i, mc, dblMC + dblDelta);
+			Worker.setMetricComponent(liGResult, null, null, None, i, mc, dblMC + dblDelta);
 		}
 
 		return liGResult;

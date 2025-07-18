@@ -2,16 +2,24 @@ package ianmarshall;
 
 import cern.colt.matrix.DoubleFactory2D;
 import cern.colt.matrix.DoubleMatrix2D;
-
+import ianmarshall.MetricAndDerivatives.DerivativeLevel;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.None;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstRadius;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstTime;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.SecondRadius;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.SecondTime;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstRadiusFirstTime;
 import ianmarshall.MetricComponents.MetricComponent;
 import static ianmarshall.MetricComponents.MetricComponent.A;
 import static ianmarshall.MetricComponents.MetricComponent.B;
-import static ianmarshall.Worker.DerivativeLevel.First;
-import static ianmarshall.Worker.DerivativeLevel.None;
-import static ianmarshall.Worker.DerivativeLevel.Second;
+import static ianmarshall.MetricComponents.MetricComponent.D;
+import ianmarshall.MetricComponents.MetricPosition;
+import static ianmarshall.MetricComponents.MetricPosition.R;
+import static ianmarshall.MetricComponents.MetricPosition.T;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -41,15 +49,11 @@ public class Worker implements Runnable
 	private int m_nRun = 0;
 	private int m_nRuns = 0;
 
-
-	// These are tensor values, with metric components for each value of radius
-	private List<MetricComponents> m_liG = null;
-	private List<MetricComponents> m_liGFirstDerivative = null;
-	private List<MetricComponents> m_liGSecondDerivative = null;
-
-	// These hold the values of the metric tensor, which store metric components for each value of radius and time
-	private MetricComponents m_mcxG = null;
-
+	/**
+	 * This holds the values of the metric tensor, and optionally their derivatives,
+	 * each of which stores metric components for each value of radius and time.
+	 */
+	private MetricAndDerivatives m_madG = null;
 
 	private boolean m_bFirstRun = true;    // This will also be true when resuming running after a pause
 	private volatile boolean m_bStopping = false;
@@ -67,14 +71,14 @@ public class Worker implements Runnable
 	 *   The the application's start parameters.
 	 * @param nRun
 	 *   The number of runs already executed. A value of <code>0</code> means no run has yet been executed.
-	 * @param liG
+	 * @param madG
 	 *   If not <code>null</code> then use this to set the metric tensor values, otherwise calculate the initial values.
 	 */
-	public Worker(StartParameters spStartParameters, int nRun, List<MetricComponents> liG)
+	public Worker(StartParameters spStartParameters, int nRun, MetricAndDerivatives madG)
 	{
 		m_nRun = nRun;
 		m_nRuns = spStartParameters.getNumberOfRuns();
-		m_liG = liG;
+		m_madG = madG;
 		m_wuehExceptionHandler = new WorkerUncaughtExceptionHandler();
 		m_saSimulatedAnnealing = new SimulatedAnnealing(spStartParameters);
 	}
@@ -117,16 +121,10 @@ public class Worker implements Runnable
 
 			if (m_bFirstRun)
 			{
-				if (m_liG == null)
-					initialiseMetricTensors();
+				if (m_madG == null)
+					m_madG = initialiseMetricTensors();
 
-				if ((m_liGFirstDerivative == null) || (m_liGSecondDerivative == null))
-				{
-					m_liGFirstDerivative  = MetricComponents.deepCopyMetricComponents(m_liG);
-					m_liGSecondDerivative = MetricComponents.deepCopyMetricComponents(m_liG);
-				}
-
-				calculateAllDifferentialsForAllValues(m_liG, m_liGFirstDerivative, m_liGSecondDerivative);
+				calculateAllDifferentialsForAllValues(m_madG);
 
 				// The current energy has not been calculated yet
 				m_dblEnergyCurrent = m_saSimulatedAnnealing.energy(m_liG, m_liGFirstDerivative, m_liGSecondDerivative, m_nRun);
@@ -216,14 +214,13 @@ public class Worker implements Runnable
 	}
 
 	/**
-	 * Initialise the metric tensor, and its first and second derivatives with respect to radius,
-	 * with start values for logarithmically-graduated radius values.
+	 * Initialise the metric tensor, and various derivatives with respect to radius and time,
+	 * with start values for graduated radius and time values.
 	 */
-	private void initialiseMetricTensors()
+	private MetricAndDerivatives initialiseMetricTensors()
 	{
-		m_liG = new ArrayList<>();
-		m_liGFirstDerivative = new ArrayList<>();
-		m_liGSecondDerivative = new ArrayList<>();
+		List<Double> liRadii = new ArrayList<>();
+		List<Double> liTimes = new ArrayList<>();
 
 		StringBuilder sbLog = new StringBuilder("Initialising the metric components (a selection is shown)...");
 		String sIndent = " ".repeat(72);
@@ -235,14 +232,15 @@ public class Worker implements Runnable
 
 		String sFormat = "%n" + sIndent + "%5d  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f";
 
-		final double DBL_T_MIN = 0.00;
-		final double DBL_T_MAX = 100.0;
-		final double DBL_STEP_TIME = 1.0;
-
 		final double DBL_R_MIN = 1.01;
 		final double DBL_R_MAX = 100.0;
 		final double DBL_STEP_FACTOR_RADIUS = 1.014;
+
+		final double DBL_T_MIN = 0.0;
+		final double DBL_STEP_TIME = 1.0;
+
 		double dblR = DBL_R_MIN;
+		double dblT = DBL_T_MIN;
 		int i = 0;
 		boolean bLoop = true;
 		boolean bOneMoreLoop = false;
@@ -254,14 +252,12 @@ public class Worker implements Runnable
 
 			double dblA =  1.0;
 			double dblB =  -1.0;
-
-	 // public MetricComponents(double r, double t, double a, double b, double d)
-			m_liG.add(new MetricComponents(dblR, dblA, dblB));
-			m_liGFirstDerivative.add(new MetricComponents(dblR, 0.0, 0.0));
-			m_liGSecondDerivative.add(new MetricComponents(dblR, 0.0, 0.0));
+			double dblD =  1.0;    // Let us try first having D positive (it could turn out to be negative instead)
+			liRadii.add(dblR);
+			liTimes.add(dblT);
 
 			if ((i >= 662) || ((i % 100) == 0))
-				sbLog.append(String.format(sFormat, i, dblR, dblA, dblB));
+				sbLog.append(String.format(sFormat, i, dblT, dblR, dblA, dblB, dblD));
 
 			double dblRNew = ((dblR  - 1.0) * DBL_STEP_FACTOR_RADIUS) + 1.0;
 
@@ -276,264 +272,295 @@ public class Worker implements Runnable
 			else
 				bLoop = false;
 
+			dblT += DBL_STEP_TIME;
 			i++;
 		}
 
+		MetricAndDerivatives madResult = buildMetricAndDerivatives(liRadii, liTimes);
 		logger.info(sbLog.toString());
 		logger.info("The metric components have been initialised.");
+		return madResult;
 	}
 
 	/**
-	 * Calculate the first and second differentials of all the metric tensor components with respect to radius.
+	 * Build an initialised metric and its derivatives from the supplied radius and time values.
+	 * @param liRadii
+	 *   The list of radius values to be used for the metric tensor components.
+	 * @param liTimes
+	 *   The list of time values to be used for the metric tensor components.
+	 * @return
+	 *   A <code>MetricAndDerivatives</code> object holding the initialised metric and its derivatives.
+	 */
+	private MetricAndDerivatives buildMetricAndDerivatives(List<Double> liRadii, List<Double> liTimes)
+	{
+		MetricAndDerivatives madResult = new MetricAndDerivatives(liRadii, liTimes);
+		return madResult;
+	}
+
+	/**
+	 * Calculate the first- and second-order differentials of all the metric tensor components
+	 * with respect to radius and/or time.
 	 * <br>
 	 * All of the parameters must be not <code>null</code> and contain the same number of elements
-	 * for the same radius values. This number of elements must be at least 5.
-	 * @param liG
-	 *   The metric tensor components.
-	 * @param liGFirstDerivative
-	 *   The first differential of the metric tensor components with respect to radius.
-	 * @param liGSecondDerivative
-	 *   The second differential of the metric tensor components with respect to radius.
+	 * for the same radius and time values. This number of elements must be at least 5.
+	 * @param madG
+	 *   The metric tensor components and its derivatives.
 	 */
-	private void calculateAllDifferentialsForAllValues(
-	 List<MetricComponents> liG,
-	 List<MetricComponents> liGFirstDerivative,
-	 List<MetricComponents> liGSecondDerivative)
+	private void calculateAllDifferentialsForAllValues(MetricAndDerivatives madG)
 	{
-		final int N = liG.size() - 1;
-		DerivativeLevel[] adlDerivativeLevel = {First, Second};
+		int nRadiusElements = madG.getNRadiusElements();
+		int nTimeElements   = madG.getNTimeElements();
 
-		for (int i = 0; i <= N; i++)
-		{
-			MetricComponents mc1 = liGFirstDerivative.get(i);
-			mc1.setA(0.0);
-			mc1.setB(0.0);
+		for (DerivativeLevel dlDerivativeLevel: DerivativeLevel.values())
+			if (dlDerivativeLevel != None)
+			{
+				MetricPosition mpVarying;
+				switch(dlDerivativeLevel)
+				{
+					case FirstRadius:
+					case SecondRadius:
+						mpVarying = R;
+						break;
+					case FirstTime:
+					case SecondTime:
+					case FirstRadiusFirstTime:
+						// It does not matter whether we use R or T here, but we must be consistent with the code lower down
+						mpVarying = T;
+						break;
+					default:
+						throw new RuntimeException(String.format("Invalid derivative level \"%s\".", dlDerivativeLevel.toString()));
+				}
 
-			MetricComponents mc2 = liGSecondDerivative.get(i);
-			mc2.setA(0.0);
-			mc2.setB(0.0);
-		}
-
-		for (MetricComponent mcMetricComponent: MetricComponent.values())
-			for (DerivativeLevel dlDerivativeLevel: adlDerivativeLevel)
-				for (int i = 0; i <= N; i++)
-					calculateDifferentialOfMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, dlDerivativeLevel, i,
-					 mcMetricComponent);
+				for (MetricComponent mcMetricComponent: MetricComponent.values())
+					for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
+						for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
+							calculateDifferentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
+							 mcMetricComponent);
+			}
 	}
 
 	/**
 	 * Calculate the specified level of differential of the specified metric component and store it
-	 * in the appropriate list supplied.
+	 * in the <code>MetricAndDerivatives</code> object supplied.
 	 * <br>
-	 * All of the list parameters must be not <code>null</code> and contain the same number of elements
-	 * for the same radius values. This number of elements must be at least 3.
-	 * @param liG
-	 *   A list of the metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGFirstDerivative
-	 *   A list of first derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGSecondDerivative
-	 *   A list of second derivative metric tensor values, in order of ascending adjacent radius values.
+	 * All of the list parameters must be not <code>null</code> and contain at least 3 elements
+	 * for each space-time dimension (time and radius here).
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
 	 * @param dlDerivativeLevel
 	 *   The derivative level to be calculated.
-	 * @param nIndex
-	 *   The zero-based index value of the metric component, the differential of which is to be calculated.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the metric component, the differential of which is to be calculated.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the metric component, the differential of which is to be calculated.
+	 * @param mpVarying
+	 *   The metric position, the varying of the value at which is to be calculated.
 	 * @param mcMetricComponent
 	 *   The metric component, the differential of which is to be calculated.
 	 */
-	private void calculateDifferentialOfMetricComponent(
-	 List<MetricComponents> liG,
-	 List<MetricComponents> liGFirstDerivative,
-	 List<MetricComponents> liGSecondDerivative,
-	 DerivativeLevel dlDerivativeLevel, int nIndex,
-	 MetricComponent mcMetricComponent)
+	private void calculateDifferentialOfMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
+	 int nRIndex, int nTIndex, MetricPosition mpVarying, MetricComponent mcMetricComponent)
 	{
-			double dblValue = differentialOfMetricComponent(liG, dlDerivativeLevel, nIndex, mcMetricComponent);
-
-			setMetricComponentOfDerivativeLevel(liG, liGFirstDerivative,
-			 liGSecondDerivative, dlDerivativeLevel, nIndex, mcMetricComponent,
-			 dblValue);
+		double dblValue = differentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
+		 mcMetricComponent);
+		setMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying, mcMetricComponent, dblValue);
 	}
 
 	/**
 	 * Calculate the specified level of differential of the specified metric component.
-	 * <br>
-	 * All of the list parameters must be not <code>null</code> and contain the same number of elements
-	 * for the same radius values. This number of elements must be at least 3.
-	 * @param liG
-	 *   A list of the metric tensor values, in order of ascending adjacent radius values.
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
 	 * @param dlDerivativeLevel
 	 *   The derivative level to be calculated.
-	 * @param nIndex
-	 *   The zero-based index value of the metric component, the differential of which is to be calculated.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the metric component, the differential of which is to be calculated.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the metric component, the differential of which is to be calculated.
+	 * @param mpVarying
+	 *   The metric position, the varying of the value at which is to be calculated.
 	 * @param mcMetricComponent
 	 *   The metric component, the differential of which is to be calculated.
 	 * @return
-	 *   The specified level of differential of the specified metric component with respect to radius,
-	 *   calculated at or near the radius of the entry of the list of the given index.
+	 *   The specified level of differential of the specified metric component.
 	 */
-	private double differentialOfMetricComponent(
-	 List<MetricComponents> liG, DerivativeLevel dlDerivativeLevel, int nIndex, MetricComponent mcMetricComponent)
+	private double differentialOfMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
+	 int nRIndex, int nTIndex, MetricPosition mpVarying, MetricComponent mcMetricComponent)
 	{
 		double dblResult = 0.0;
-		final int N = liG.size() - 1;    // The maximum index value
+
+		DerivativeLevel dlGetting;
+		switch(dlDerivativeLevel)
+		{
+			case FirstRadius:
+			case SecondRadius:
+			case FirstTime:
+			case SecondTime:
+				dlGetting = None;
+				break;
+			case FirstRadiusFirstTime:
+				// We must be consistent with whether we vary R or T in this case. The statement below does this automatically.
+				dlGetting = mpVarying == T ? FirstRadius : FirstTime;
+				break;
+			default:
+				throw new RuntimeException(String.format("Invalid derivative level \"%s\".", dlDerivativeLevel.toString()));
+		}
+
+		int nVaryingIndex = -1;
+		int nVaryingMaxIndex = -1;
+		switch (mpVarying)
+		{
+			case R:
+				nVaryingIndex = nRIndex;
+				nVaryingMaxIndex = madG.getNRadiusElements() - 1;
+				break;
+			case T:
+				nVaryingIndex = nTIndex;
+				nVaryingMaxIndex = madG.getNTimeElements() - 1;
+				break;
+		}
 
 		// The middle elements (index 1) are those of the point, the derivatives of which are to be calculated.
 		// This may be different from the index supplied if it is the first or last point.
-		// In these cases, we shall use forward and backward differences instead, respectively.
-		double[] adblR = new double[3];
-		double[] adblX = new double[3];
+		// In these cases, we shall use forward and backward differences, respectively, instead.
+		double[] adblPos = new double[3];
+		double[] adblComponent = new double[3];
 
-		final int N_START;
-		if (nIndex == 0)
-			N_START = nIndex;        // Forward difference for the first point
-		else if (nIndex < N)
-			N_START = nIndex - 1;    // Central difference for the internal points
+		final int nVaryingStart;
+		if (nVaryingIndex == 0)
+			nVaryingStart = nVaryingIndex;        // Forward difference for the first point
+		else if (nVaryingIndex < nVaryingMaxIndex)
+			nVaryingStart = nVaryingIndex - 1;    // Central difference for an internal point
 		else
-			N_START = nIndex - 2;    // Backward difference for the last point
+			nVaryingStart = nVaryingIndex - 2;    // Backward difference for the last point
 
-		final int N_FINISH = N_START + 2;
-		int n = 0;                       // The array index
+		final int nVaryingFinish = nVaryingStart + 2;
+		int n = 0;    // The array index
 
 		// Load the arrays
-		for (int i = N_START; i <= N_FINISH; i++)
+		for (int i = nVaryingStart; i <= nVaryingFinish; i++)
 		{
-			Entry<Double, Double> entry = getMetricComponentOfDerivativeLevel(liG, null, null, DerivativeLevel.None, i,
-			 mcMetricComponent);
-			adblR[n] = entry.getKey().doubleValue();
-			adblX[n] = entry.getValue().doubleValue();
+			switch (mpVarying)
+			{
+				case R:
+					nRIndex = i;
+					break;
+				case T:
+					nTIndex = i;
+					break;
+			}
+
+			Entry<Double, Double> entry = getMetricComponent(madG, dlGetting, nRIndex, nTIndex, mpVarying, mcMetricComponent);
+			adblPos[n] = entry.getKey().doubleValue();
+			adblComponent[n] = entry.getValue().doubleValue();
 			n++;
 		}
 
-		double dblFirstDifferentialNext = (adblX[2] - adblX[1]) / (adblR[2] - adblR[1]);
-		double dblFirstDifferentialPrev = (adblX[1] - adblX[0]) / (adblR[1] - adblR[0]);
+		double dblFirstDifferentialNext = (adblComponent[2] - adblComponent[1]) / (adblPos[2] - adblPos[1]);
+		double dblFirstDifferentialPrev = (adblComponent[1] - adblComponent[0]) / (adblPos[1] - adblPos[0]);
 
-		switch (dlDerivativeLevel)
+		switch(dlDerivativeLevel)
 		{
-			case First:
+			case FirstRadius:
+			case FirstTime:
+			case FirstRadiusFirstTime:
 				dblResult = 0.5 * (dblFirstDifferentialNext + dblFirstDifferentialPrev);
 				break;
-			case Second:
-				dblResult = 2.0 * (dblFirstDifferentialNext - dblFirstDifferentialPrev) / (adblR[2] - adblR[0]);
+			case SecondRadius:
+			case SecondTime:
+				dblResult = 2.0 * (dblFirstDifferentialNext - dblFirstDifferentialPrev) / (adblComponent[2] - adblComponent[0]);
 				break;
-			default:
-				throw new RuntimeException(String.format(
-				 "Invalid differentiation request for:"
-					+ "%n  dlDerivativeLevel = \"%s\","
-					+ "%n  mcMetricComponent = \"%s\","
-					+ "%n  nIndex            = %d,"
-					+ "%n  N                 = %d.",
-				 dlDerivativeLevel.toString(), mcMetricComponent.toString(), nIndex, N));
+			default:    // For example: None
+				throw new RuntimeException(String.format("Invalid differentiation request for:"
+				 + "%n  dlDerivativeLevel = %s,"
+				 + "%n  nRIndex           = %d,"
+				 + "%n  nTIndex           = %d,"
+				 + "%n  mpVarying         = %s,"
+				 + "%n  mcMetricComponent = %s,"
+				 + "%n  dlGetting         = %s.",
+				 dlDerivativeLevel.toString(), nRIndex, nTIndex, mpVarying.toString(), mcMetricComponent.toString(),
+				 dlGetting.toString()));
 		}
 
 		return dblResult;
 	}
 
 	/**
-	 * Get the specified radius and metric component of the specified level of differential of the specified index
-	 * from the lists supplied.
-	 * <br>
-	 * The list parameter for the derivative level sought must be not <code>null</code> and must contain the same number
-	 * of elements for the same radius values as any other list parameter used.
-	 * @param liG
-	 *   A list of the metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGFirstDerivative
-	 *   A list of first derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGSecondDerivative
-	 *   A list of second derivative metric tensor values, in order of ascending adjacent radius values.
+	 * Get the value of the specified component of the specified level of differential of the specified indices
+	 * at the specified metric position from the <code>MetricAndDerivatives</code> supplied.
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
 	 * @param dlDerivativeLevel
 	 *   The derivative level to be found.
-	 * @param nIndex
-	 *   The zero-based index value of the metric component to be found.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the metric component to be found.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the metric component to be found.
+	 * @param mpMetricPosition
+	 *   The metric position to be found.
 	 * @param mcMetricComponent
 	 *   The metric component to be found.
 	 * @return
-	 *   The specified radius and metric component of the specified level of differential of the specified index
-	 *   from the lists supplied.
+	 *   An <code>Entry</code> with:
+	 *   <ul>
+	 *     <li>key: the value of the specified metric position</li>
+	 *     <li>value: the value of the specified component of the specified level of differential of the specified index.
+	 *     </li>
+	 *   </ul>
 	 */
-	public static Entry<Double, Double> getMetricComponentOfDerivativeLevel(
-	 List<MetricComponents> liG,
-	 List<MetricComponents> liGFirstDerivative,
-	 List<MetricComponents> liGSecondDerivative,
-	 DerivativeLevel dlDerivativeLevel, int nIndex, MetricComponent mcMetricComponent)
+	public static Entry<Double, Double> getMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
+	 int nRIndex, int nTIndex, MetricPosition mpMetricPosition, MetricComponent mcMetricComponent)
 	{
-		MetricComponents mcMetricComponents =
-		 getMetricComponents(liG, liGFirstDerivative, liGSecondDerivative, dlDerivativeLevel, nIndex);
-		Entry<Double, Double> entryResult = mcMetricComponents.getComponent(mcMetricComponent);
-		return entryResult;
+		MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
+		return mcMetricComponents.getComponent(mpMetricPosition, mcMetricComponent);
 	}
 
 	/**
-	 * Set the specified metric component of the specified level of differential of the specified index
-	 * using the lists supplied.
-	 * <br>
-	 * All of the list parameters must be not <code>null</code> and contain the same number of elements
-	 * for the same radius values.
-	 * @param liG
-	 *   A list of the metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGFirstDerivative
-	 *   A list of first derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGSecondDerivative
-	 *   A list of second derivative metric tensor values, in order of ascending adjacent radius values.
+	 * Set the value of the specified component of the specified level of differential of the specified indices
+	 * at the specified metric position in the <code>MetricAndDerivatives</code> supplied.
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
 	 * @param dlDerivativeLevel
-	 *   The derivative level to be set.
-	 * @param nIndex
-	 *   The zero-based index value of the metric component to be set.
+	 *   The derivative level of the value to be set.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the metric component to be set.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the metric component to be set.
+	 * @param mpMetricPosition
+	 *   The metric position of the value to be set.
 	 * @param mcMetricComponent
-	 *   The metric component to be set.
+	 *   The metric component of the value to be set.
 	 * @param dblValue
-	 *   The metric component value to be set.
+	 *   The value to be set.
 	 */
-	public static void setMetricComponentOfDerivativeLevel(
-	 List<MetricComponents> liG,
-	 List<MetricComponents> liGFirstDerivative,
-	 List<MetricComponents> liGSecondDerivative,
-	 DerivativeLevel dlDerivativeLevel, int nIndex, MetricComponent mcMetricComponent, double dblValue)
+	public static void setMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel, int nRIndex,
+	 int nTIndex, MetricPosition mpMetricPosition, MetricComponent mcMetricComponent, double dblValue)
 	{
-		MetricComponents mcMetricComponents =
-		 getMetricComponents(liG, liGFirstDerivative, liGSecondDerivative, dlDerivativeLevel, nIndex);
-		mcMetricComponents.setComponent(mcMetricComponent, dblValue);
+		Entry<Double, Double> entry = getMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpMetricPosition,
+		 mcMetricComponent);
+		entry.setValue(Double.valueOf(dblValue));
 	}
 
 	/**
 	 * Obtain the <code>MetricComponents</code> for the given parameters.
-	 * @param liG
-	 *   A list of the metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGFirstDerivative
-	 *   A list of first derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGSecondDerivative
-	 *   A list of second derivative metric tensor values, in order of ascending adjacent radius values.
+	 *
+	 * Get the <code>MetricComponents</code> of the specified level of differential of the specified index
+	 * from the <code>MetricAndDerivatives</code> supplied.
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
 	 * @param dlDerivativeLevel
-	 *   The derivative level.
-	 * @param nIndex
-	 *   The zero-based index value of the metric component.
+	 *   The derivative level to be found.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the metric component to be found.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the metric component to be found.
 	 * @return
 	 *   The <code>MetricComponents</code>.
 	 */
-	private static MetricComponents getMetricComponents(
-	 List<MetricComponents> liG,
-	 List<MetricComponents> liGFirstDerivative,
-	 List<MetricComponents> liGSecondDerivative,
-	 DerivativeLevel dlDerivativeLevel, int nIndex)
+	private static MetricComponents getMetricComponents(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
+	 int nRIndex, int nTIndex)
 	{
-		MetricComponents mcMetricComponents = null;
-
-		switch (dlDerivativeLevel)
-		{
-			case None:
-				mcMetricComponents = liG.get(nIndex);
-				break;
-			case First:
-				mcMetricComponents = liGFirstDerivative.get(nIndex);
-				break;
-			case Second:
-				mcMetricComponents = liGSecondDerivative.get(nIndex);
-				break;
-			default:
-				throw new RuntimeException(String.format(
-				 "Derivative level \"%s\" not found.", dlDerivativeLevel.toString()));
-		}
-
-		return mcMetricComponents;
+		Metric mMetric = madG.getMetric(dlDerivativeLevel);
+		return mMetric.getMetricComponents(nRIndex, nTIndex);
 	}
 
 	/*
@@ -618,21 +645,21 @@ public class Worker implements Runnable
 	public static DoubleMatrix2D calculateRicciTensorValues(List<MetricComponents> liG,
 	 List<MetricComponents> liGFirstDerivative, List<MetricComponents> liGSecondDerivative, int nIndex)
 	{
-		Entry<Double, Double> entry = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative,
+		Entry<Double, Double> entry = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative,
 		 None, nIndex, A);
 		double dblR = entry.getKey().doubleValue();
 		double dblA = entry.getValue().doubleValue();
 
-		double dblB = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, None, nIndex, B).
+		double dblB = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, None, nIndex, B).
 		 getValue().doubleValue();
 
-		double dAdR = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, A)
+		double dAdR = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, A)
 		 .getValue().doubleValue();
 
-		double dBdR = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, B)
+		double dBdR = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, B)
 		 .getValue().doubleValue();
 
-		double d2AdR2 = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, Second, nIndex, A)
+		double d2AdR2 = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, Second, nIndex, A)
 		 .getValue().doubleValue();
 
 		double dblR00 = ((1.0 / (dblB * dblR)) * dAdR)
@@ -672,18 +699,18 @@ public class Worker implements Runnable
 
 		for (int i = 0; i < m_liG.size(); i++)
 		{
-			Entry<Double, Double> entry = getMetricComponentOfDerivativeLevel(m_liG, null, null, None, i, A);
+			Entry<Double, Double> entry = getMetricComponent(m_liG, null, null, None, i, A);
 			double dblR = entry.getKey().doubleValue();
 			double dblA = entry.getValue().doubleValue();
-			double dblB = getMetricComponentOfDerivativeLevel(m_liG, null, null, None, i, B).getValue().doubleValue();
+			double dblB = getMetricComponent(m_liG, null, null, None, i, B).getValue().doubleValue();
 
-			double dAdR = getMetricComponentOfDerivativeLevel(
+			double dAdR = getMetricComponent(
 			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, First, i, A).getValue().doubleValue();
-			double dBdR = getMetricComponentOfDerivativeLevel(
+			double dBdR = getMetricComponent(
 			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, First, i, B).getValue().doubleValue();
-			double d2AdR2 = getMetricComponentOfDerivativeLevel(
+			double d2AdR2 = getMetricComponent(
 			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, Second, i, A).getValue().doubleValue();
-			double d2BdR2 = getMetricComponentOfDerivativeLevel(
+			double d2BdR2 = getMetricComponent(
 			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, Second, i, B).getValue().doubleValue();
 
 	 // String sFormat = "%n  %5d, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f";    // For use in CSV format

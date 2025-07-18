@@ -1,8 +1,6 @@
 package ianmarshall;
 
 import java.util.AbstractMap.SimpleEntry;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map.Entry;
 
 /**
@@ -11,11 +9,7 @@ import java.util.Map.Entry;
  */
 public class MetricComponents
 {
-	/**
-	 * This is private until it is used outside this class.
-	 * It is used to identify the position of a <code>MetricComponent</code> in the metric tensor.
-	*/
-	private enum MetricPosition
+	public enum MetricPosition
 	{
 		R, T
 	}
@@ -23,15 +17,6 @@ public class MetricComponents
 	public enum MetricComponent
 	{
 		A, B, D
-	}
-
-	/**
-	 * These are the Ricci tensor components which can be non-zero.
-	 * R33 is excluded since this is simply R22 * ((sin theta)^2).
-	 */
-	public enum RicciTensor
-	{
-		R00, R01, R11, R22
 	}
 
 	private double m_R = 0.0;    // The radius co-ordinate of the metric
@@ -99,27 +84,40 @@ public class MetricComponents
 		m_D = d;
 	}
 
-	public Entry<Double, Double> getComponent(MetricComponent mc)
+	public Entry<Double, Double> getComponent(MetricPosition mp, MetricComponent mc)
 	{
-		double dbl = 0.0;
+		double dblPosition;
+		switch (mp)
+		{
+			case R:
+				dblPosition = getR();
+				break;
+			case T:
+				dblPosition = getT();
+				break;
+			default:
+				String sMP = mp != null ? mp.toString() : "[null]";
+				throw new IllegalArgumentException(String.format("Metric position \"%s\" not found.", sMP));
+		}
 
+		double dblComponent;
 		switch (mc)
-			{
-				case A:
-					dbl = getA();
-					break;
-				case B:
-					dbl = getB();
-					break;
-				case D:
-					dbl = getD();
-					break;
-				default:
-					throw new IllegalArgumentException(String.format("Metric component \"%s\" not found.", mc.toString()));
-			}
+		{
+			case A:
+				dblComponent = getA();
+				break;
+			case B:
+				dblComponent = getB();
+				break;
+			case D:
+				dblComponent = getD();
+				break;
+			default:
+				String sMC = mc != null ? mc.toString() : "[null]";
+				throw new IllegalArgumentException(String.format("Metric component \"%s\" not found.", sMC));
+		}
 
-		Entry<Double, Double> entryResult = new SimpleEntry<>(Double.valueOf(getR()), Double.valueOf(dbl));
-		return entryResult;
+		return new SimpleEntry<>(Double.valueOf(dblPosition), Double.valueOf(dblComponent));
 	}
 
 	public void setComponent(MetricComponent mc, double dbl)
@@ -145,7 +143,7 @@ public class MetricComponents
 		return new MetricComponents(getR(), getT(), getA(), getB(), getD());
 	}
 
-	/**
+	/*
 	 * Make a deep copy of a list of <code>MetricComponents</code>.
 	 * @param liG
 	 *   The list of <code>MetricComponents</code> to be copied.
@@ -153,6 +151,7 @@ public class MetricComponents
 	 * @return
 	 *   A deep copy of the list supplied.
 	 */
+	/*
 	public static List<MetricComponents> deepCopyMetricComponents(List<MetricComponents> liG)
 	{
 		int nSize = liG != null ? liG.size() : 0;
@@ -167,4 +166,5 @@ public class MetricComponents
 
 		return liResult;
 	}
+	*/
 }
