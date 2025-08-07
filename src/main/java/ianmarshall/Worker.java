@@ -12,6 +12,7 @@ import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstRadiusFirstT
 import ianmarshall.MetricComponents.MetricComponent;
 import static ianmarshall.MetricComponents.MetricComponent.A;
 import static ianmarshall.MetricComponents.MetricComponent.B;
+import static ianmarshall.MetricComponents.MetricComponent.C;
 import static ianmarshall.MetricComponents.MetricComponent.D;
 import ianmarshall.MetricComponents.MetricPosition;
 import static ianmarshall.MetricComponents.MetricPosition.R;
@@ -43,6 +44,8 @@ public class Worker implements Runnable
 
 	}
 
+	private static final double c = 3.0e8;    // The speed of light in m/s
+	private static final double c2 = c * c;
 	// private static final double DBL_SUCCESS_LOG_PROBABILITY = 0.001;
 	private static final Logger logger = LoggerFactory.getLogger(Worker.class);
 	private static final StringBuilder s_sbMoveLog = new StringBuilder();    // Refactor this for multi-instance use
@@ -117,7 +120,7 @@ public class Worker implements Runnable
 		while ((!m_bStopping) && (m_nRun < m_nRuns))
 		{
 			m_nRun++;
-	 // logger.info(String.format("Started run number %s.", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
+			logger.info(String.format("Started run number %s.", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
 
 			if (m_bFirstRun)
 			{
@@ -127,7 +130,7 @@ public class Worker implements Runnable
 				calculateAllDifferentialsForAllValues(m_madG);
 
 				// The current energy has not been calculated yet
-				m_dblEnergyCurrent = m_saSimulatedAnnealing.energy(m_liG, m_liGFirstDerivative, m_liGSecondDerivative, m_nRun);
+				m_dblEnergyCurrent = m_saSimulatedAnnealing.energy(m_madG, m_nRun);
 
 				m_bFirstRun = false;
 			}
@@ -625,61 +628,158 @@ public class Worker implements Runnable
 	*/
 
 	/**
-	 * Calculate the Ricci tensor values at the given point in space-time (the radius).
-	 * <br>
-	 * All of the list parameters must be not <code>null</code> and contain the
-	 * same number of elements for the same radius values.
-	 * This number of elements must be at least 5.
-	 * @param liG
-	 *   A list of the metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGFirstDerivative
-	 *   A list of first derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGSecondDerivative
-	 *   A list of second derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param nIndex
-	 *   The zero-based index of the metric component of the point in space-time (the radius) to be used.
+	 * Calculate the Ricci tensor values at the given point in space-time.
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the point in space-time to be used.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the point in space-time to be used.
 	 * @return
-	 *   The Ricci tensor values at the given point in space-time (the radius) as the vector (1-D column matrix):
-	 *   <code>(R00, R11, R22)T</code>.
+	 *   The Ricci tensor values at the given point in space-time (the radius and time) as the vector (1-D column matrix):
+	 *   <code>(R00, R01, R11, R22)T</code>.
 	 */
-	public static DoubleMatrix2D calculateRicciTensorValues(List<MetricComponents> liG,
-	 List<MetricComponents> liGFirstDerivative, List<MetricComponents> liGSecondDerivative, int nIndex)
+	public static DoubleMatrix2D calculateRicciTensorValues(MetricAndDerivatives madG, int nRIndex, int nTIndex)
 	{
-		Entry<Double, Double> entry = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative,
-		 None, nIndex, A);
-		double dblR = entry.getKey().doubleValue();
+		double dblR = getMetricComponent(madG, None, nRIndex, nTIndex, R, A).getKey().doubleValue();
+		Entry<Double, Double> entry = getMetricComponent(madG, None, nRIndex, nTIndex, T, A);
+		double dblT = entry.getKey().doubleValue();
 		double dblA = entry.getValue().doubleValue();
+		double dblB = getMetricComponent(madG, None, nRIndex, nTIndex, R, B).getValue().doubleValue();
+		double dblC = getMetricComponent(madG, None, nRIndex, nTIndex, R, C).getValue().doubleValue();
+		double dblD = getMetricComponent(madG, None, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
-		double dblB = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, None, nIndex, B).
-		 getValue().doubleValue();
+		double dAdR = getMetricComponent(madG, FirstRadius, nRIndex, nTIndex, R, A).getValue().doubleValue();
+		double dBdR = getMetricComponent(madG, FirstRadius, nRIndex, nTIndex, R, B).getValue().doubleValue();
+		double dCdR = getMetricComponent(madG, FirstRadius, nRIndex, nTIndex, R, C).getValue().doubleValue();
+		double dDdR = getMetricComponent(madG, FirstRadius, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
-		double dAdR = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, A)
-		 .getValue().doubleValue();
+		double dAdT = getMetricComponent(madG, FirstTime, nRIndex, nTIndex, R, A).getValue().doubleValue();
+		double dBdT = getMetricComponent(madG, FirstTime, nRIndex, nTIndex, R, B).getValue().doubleValue();
+		double dCdT = getMetricComponent(madG, FirstTime, nRIndex, nTIndex, R, C).getValue().doubleValue();
+		double dDdT = getMetricComponent(madG, FirstTime, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
-		double dBdR = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, B)
-		 .getValue().doubleValue();
+		double d2AdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, A).getValue().doubleValue();
+		double d2BdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, B).getValue().doubleValue();
+		double d2CdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, C).getValue().doubleValue();
+		double d2DdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
-		double d2AdR2 = getMetricComponent(liG, liGFirstDerivative, liGSecondDerivative, Second, nIndex, A)
-		 .getValue().doubleValue();
+		double d2AdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, A).getValue().doubleValue();
+		double d2BdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, B).getValue().doubleValue();
+		double d2CdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, C).getValue().doubleValue();
+		double d2DdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
-		double dblR00 = ((1.0 / (dblB * dblR)) * dAdR)
-		 - ((1.0 / (4.0 * dblA * dblB)) * dAdR * dAdR)
+		double d2AdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, A).getValue().doubleValue();
+		double d2BdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, B).getValue().doubleValue();
+		double d2CdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, C).getValue().doubleValue();
+		double d2DdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, D).getValue().doubleValue();
+
+		double dblFactor1 = (2.0 / (dblD * dblD)) - (1.0 / (4.0 * dblA * dblB));
+		double dblFactor2 = (1.0 / (dblD * dblD)) - (1.0 / (4.0 * dblA * dblB));
+
+		double dblR00 = -((2.0 / (dblD * c * dblR)) * dAdT)
+		 + ((1.0 / (dblB * dblR)) * dAdR)
+		 - ((1.0 / (dblB * c * dblR)) * dDdT)
+		 + ((dblFactor1 / c2) * dAdT * dBdT)
+		 - ((1.0 / (2.0 * dblB * dblD * c)) * dAdT * dBdR)
+		 - ((1.0 / (2.0 * dblA * dblC * c2)) * dAdT * dCdT)
+		 - ((1.0 / (2.0 * dblB * dblD * c)) * dAdT * dBdR)
+		 - ((1.0 / (dblC * dblD * c)) * dAdT * dCdR)
+		 + (dblFactor1 * dAdR * dAdR)
+		 - ((1.0 / (2.0 * dblB * dblD * c)) * dAdR * dBdT)
 		 - ((1.0 / (4.0 * dblB * dblB)) * dAdR * dBdR)
-		 + ((1.0 / (2.0 * dblB)) * d2AdR2);
+		 - ((1.0 / (dblC * dblD * c)) * dAdR * dCdT)
+		 - ((1.0 / (2.0 * dblB * dblC)) * dAdR * dCdR)
+		 - ((dblFactor1 / c) * dAdR * dDdT)
+		 + ((1.0 / (2.0 * dblB * dblD)) * dAdR * dDdR)
+		 + ((1.0 / (2.0 * dblB * dblD * c2)) * dBdT * dDdT)
+		 - ((1.0 / (4.0 * dblB * dblB * c2)) * dBdT * dBdT)
+		 + ((1.0 / (4.0 * dblB * dblB * c)) * dBdR * dDdT)
+		 - ((1.0 / (2.0 * dblC * dblC * c2)) * dCdT * dCdT)
+		 - ((1.0 / (dblC * dblD * c2)) * dCdT * dDdT)
+		 - ((1.0 / (2.0 * dblB * dblC * c)) * dCdR * dDdT)
+		 - ((1.0 / (2.0 * dblB * dblD * c)) * dDdT * dDdR)
+		 + ((1.0 / (2.0 * dblB)) * d2AdR2)
+		 + ((1.0 / (2.0 * dblB * c2)) * d2BdT2)
+		 + ((1.0 / (dblC * c2)) * d2CdT2)
+		 - ((1.0 / (2.0 * dblB * c)) * d2DdRdT);
 
-		double dblR11 = -((1.0 / (dblB * dblR)) * dBdR)
-		 - ((1.0 / (4.0 * dblA * dblB)) * dAdR * dBdR)
+		double dblR01 = -((2.0 / (dblD * dblR)) * dAdR)
+		 - ((1.0 / (dblB * dblR * c)) * dBdT)
+		 + ((1.0 / (dblC * dblR * c)) * dCdT)
+		 - ((1.0 / (2.0 * dblA * dblD)) * dAdR * dAdR)
+		 - ((1.0 / (2.0 * dblB * dblD * c2)) * dBdT * dBdT)
+		 - ((1.0 / (2.0 * dblA * dblD * c2)) * dAdT * dBdT)
+		 + ((1.0 / (dblD * dblD * c)) * dAdT * dBdR)
+		 - ((1.0 / (2.0 * dblA * dblD * c)) * dAdT * dDdR)
+		 - ((1.0 / (dblD * dblD * c)) * dAdR * dBdT)
+		 - ((1.0 / (2.0 * dblB * dblD)) * dAdR * dBdR)
+		 - ((1.0 / (2.0 * dblA * dblC * c)) * dAdR * dCdT)
+		 - ((1.0 / (dblC * dblD)) * dAdR * dCdR)
+		 + (dblFactor2 * dAdR * dDdR)
+		 - ((1.0 / (dblC * dblD * c2)) * dBdT * dCdT)
+		 - ((1.0 / (2.0 * dblB * dblC * c)) * dBdT * dCdR)
+		 + ((dblFactor2 / c2) * dBdT * dDdT)
+		 + ((1.0 / (2.0 * dblB * dblD * c)) * dBdR * dDdT)
+		 - ((1.0 / (2.0 * dblC * dblC * c)) * dCdT * dCdR)
+		 - ((dblFactor2 / c) * dDdT * dDdR)
+		 - ((1.0 / dblD) * d2AdR2)
+		 - ((1.0 / (dblD * c2)) * d2BdT2)
+		 + ((1.0 / (dblC * c)) * d2CdRdT)
+		 + ((1.0 / (dblD * c)) * d2DdRdT);
+
+		double dblR11 = ((2.0 / (dblD * c * dblR)) * dBdT)
+		 - ((1.0 / (dblB * dblR)) * dBdR)
+		 + ((2.0 / (dblC * dblR)) * dCdR)
+		 - ((2.0 / (dblD * dblR)) * dDdR)
+		 - ((1.0 / (4.0 * dblA * dblA * c2)) * dAdT * dBdT)
+		 - ((1.0 / (2.0 * dblA * dblD * c)) * dAdT * dBdR)
+		 + ((1.0 / (4.0 * dblA * dblA * c)) * dAdT * dDdR)
+		 + ((1.0 / (2.0 * dblA * dblD * c)) * dAdR * dBdT)
+		 + (dblFactor1 * dAdR * dBdR)
+		 + ((1.0 / (2.0 * dblA * dblD)) * dAdR * dDdR)
+		 + ((1.0 / (2.0 * dblA * dblC * c2)) * dBdT * dCdT)
+		 + ((1.0 / (dblC * dblD * c)) * dBdT * dCdR)
+		 + ((1.0 / (2.0 * dblA * dblD * c2)) * dBdT * dDdT)
+		 - ((dblFactor1 / c) * dBdT * dDdR)
+		 - ((1.0 / (dblC * dblD * c)) * dBdR * dCdT)
+		 - ((1.0 / (2.0 * dblB * dblC)) * dBdR * dCdR)
+		 - ((1.0 / (2.0 * dblA * dblC * c)) * dCdT * dDdR)
+		 - ((1.0 / (dblC * dblD)) * dCdR * dDdR)
+		 - ((1.0 / (2.0 * dblA * dblD * c)) * dDdT * dDdR)
 		 - ((1.0 / (4.0 * dblA * dblA)) * dAdR * dAdR)
-		 + ((1.0 / (2.0 * dblA)) * d2AdR2);
+		 + ((dblFactor1 / c2) * dBdT * dBdT)
+		 - ((1.0 / (2.0 * dblC * dblC)) * dCdR * dCdR)
+		 + ((1.0 / (2.0 * dblA)) * d2AdR2)
+		 + ((1.0 / (2.0 * dblA * c2)) * d2BdT2)
+		 + ((1.0 / dblC) * d2CdR2)
+		 - ((1.0 / (2.0 * dblA * c)) * d2DdRdT);
 
-		double dblR22 = -1.0 - (1.0 / dblB)
-		 - ((dblR / (2.0 * dblA * dblB)) * dAdR)
-		 + ((dblR / (2.0 * dblB * dblB)) * dBdR);
+		double dblR22 = -1.0 + (dblC / dblB)
+		 + (((dblR * dblC) / (dblA * dblD * c)) * dAdT)
+		 + (((dblR * dblC) / (2.0 * dblA * dblB)) * dAdR)
+		 + (((dblR * dblC) / (dblB * dblD * c)) * dBdT)
+		 - (((dblR * dblC) / (2.0 * dblB * dblB)) * dBdR)
+		 + (((4.0 * dblR) / (dblD * c)) * dCdT)
+		 + (((2.0 * dblR) / dblB) * dCdR)
+		 + (((dblR * dblC) / (dblB * dblD)) * dDdR)
+		 - (((dblR * dblR) / (4.0 * dblA * dblA * c2)) * dAdT * dCdT)
+		 + (((dblR * dblR) / (2.0 * dblA * dblD * c)) * ((dAdT * dCdR) + (dAdR * dCdT)))
+		 + (((dblR * dblR) / (4.0 * dblA * dblB)) * dAdR * dCdR)
+		 + (((dblR * dblR) / (4.0 * dblA * dblB * c2)) * dBdT * dCdT)
+		 + (((dblR * dblR) / (2.0 * dblB * dblD * c)) * ((dBdT * dCdR) + (dBdR * dCdT)))
+		 - (((dblR * dblR) / (4.0 * dblB * dblB)) * dBdR * dCdR)
+		 + (((dblR * dblR) / (2.0 * dblA * dblD * c2)) * dCdT * dDdT)
+		 + (((dblR * dblR) / (2.0 * dblB * dblD)) * dCdR * dDdR)
+		 + (((dblR * dblR) / (2.0 * dblA * c2)) * d2CdT2)
+		 + (((2.0 * dblR * dblR) / (dblD * c)) * d2CdRdT)
+		 + (((dblR * dblR) / (2.0 * dblB)) * d2CdR2);
 
-		DoubleMatrix2D dvResult = DoubleFactory2D.dense.make(3, 1);
+		DoubleMatrix2D dvResult = DoubleFactory2D.dense.make(4, 1);
 		dvResult.set(0, 0, dblR00);
-		dvResult.set(1, 0, dblR11);
-		dvResult.set(2, 0, dblR22);
+		dvResult.set(1, 0, dblR01);
+		dvResult.set(2, 0, dblR11);
+		dvResult.set(3, 0, dblR22);
 		return dvResult;
 	}
 

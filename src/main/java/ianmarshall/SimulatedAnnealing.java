@@ -4,7 +4,6 @@ import cern.colt.matrix.DoubleMatrix2D;
 
 import ianmarshall.MetricComponents.MetricComponent;
 import static ianmarshall.MetricComponents.MetricComponent.A;
-import static ianmarshall.Worker.DerivativeLevel.None;
 
 import java.util.List;
 import java.util.Map.Entry;
@@ -43,72 +42,72 @@ public class SimulatedAnnealing
 	/**
 	 * The energy (goal) function.
 	 * <br/>
-	 * Calculate the energy of the state space, which is represented by the supplied tensor values and their derivatives.
-	 * @param liG
-	 *   The tensor values, with metric components for each value of radius.
-	 * @param liGFirstDerivative
-	 *   The 1st derivative of the tensor values.
-	 * @param liGSecondDerivative
-	 *   The 2nd derivative of the tensor values.
+	 * Calculate the energy of the state space, which is represented by the supplied metric tensor components
+	 * and their derivatives.
+	 * @param madG
+	 *   The metric tensor components and its derivatives.
 	 * @param nRun
-	 *   The number of runs already executed. A value of <code>0</code> means no run has yet been executed.
+	 *   The number of runs already executed. A value of <code>0</code> means that no run has yet been executed.
 	 * @return
 	 *   The energy of the state space.
 	 */
-	public double energy(List<MetricComponents> liG, List<MetricComponents> liGFirstDerivative,
-	 List<MetricComponents> liGSecondDerivative, int nRun)
+	public double energy(MetricAndDerivatives madG, int nRun)
 	{
-		double dblSumOfSquaresOfRicciTensorsOverAllR = 0.0;
-		int nSize = liG.size();
+		double dblSumOfSquaresOfRicciTensorsOverAllRAndT = 0.0;
+		int nRadiusElements = madG.getNRadiusElements();
+		int nTimeElements   = madG.getNTimeElements();
 
-		for (int i = 0; i < nSize; i++)
+		for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
 		{
-			// 3 rows by 1 column
-			DoubleMatrix2D dmRicci = Worker.calculateRicciTensorValues(liG, liGFirstDerivative, liGSecondDerivative, i);
-
-	 // boolean bLog = (nRun <= 3) && ((i == 0) || (i == 3));
-			boolean bLog = false;
-
-			if (bLog)
+			for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
 			{
-				String sMsg = String.format("%n  nRun = %d, i = %d: dmRicci has elements:%n%s .%n",
-				 nRun, i, dmRicci.toString());
-				logger.info(sMsg);
-			}
+				// 3 rows by 1 column
+				DoubleMatrix2D dmRicci = Worker.calculateRicciTensorValues(madG, nRIndex, nTIndex);
 
-			double dblSumOfSquaresOfRicciTensors = 0.0;
+		 // boolean bLog = (nRun <= 3) && ((i == 0) || (i == 3));
+				boolean bLog = false;
 
-			for (int j = 0; j < dmRicci.rows(); j++)
-			{
-				double dblRicciTensor = dmRicci.get(j, 0);
-				dblSumOfSquaresOfRicciTensors += dblRicciTensor * dblRicciTensor;
-			}
+				if (bLog)
+				{
+					String sMsg = String.format("%n  nRun = %d, i = %d: dmRicci has elements:%n%s .%n",
+					nRun, i, dmRicci.toString());
+					logger.info(sMsg);
+				}
 
-			final int nStart;
-			final int nFinish;
-			if (i == 0)
-			{
-				nStart = i;        // Forward difference for the first point
-				nFinish = nStart + 1;
-			}
-			else if (i < nSize - 1)
-			{
-				nStart = i - 1;    // Central difference for an internal point
-				nFinish = nStart + 2;
-			}
-			else
-			{
-				nStart = i - 1;    // Backward difference for the last point
-				nFinish = nStart + 1;
-			}
+				double dblSumOfSquaresOfRicciTensors = 0.0;
 
-			Entry<Double, Double> entry = Worker.getMetricComponent(liG, null, null, None, nStart, A);
-			double dblRStart = entry.getKey().doubleValue();
-			entry = Worker.getMetricComponent(liG, null, null, None, nFinish, A);
-			double dblRFinish = entry.getKey().doubleValue();
+				for (int j = 0; j < dmRicci.rows(); j++)
+				{
+					double dblRicciTensor = dmRicci.get(j, 0);
+					dblSumOfSquaresOfRicciTensors += dblRicciTensor * dblRicciTensor;
+				}
 
-			dblSumOfSquaresOfRicciTensorsOverAllR +=
-			 dblSumOfSquaresOfRicciTensors * (dblRFinish - dblRStart) / (nFinish - nStart);
+				final int nStart;
+				final int nFinish;
+				if (i == 0)
+				{
+					nStart = i;        // Forward difference for the first point
+					nFinish = nStart + 1;
+				}
+				else if (i < nSize - 1)
+				{
+					nStart = i - 1;    // Central difference for an internal point
+					nFinish = nStart + 2;
+				}
+				else
+				{
+					nStart = i - 1;    // Backward difference for the last point
+					nFinish = nStart + 1;
+				}
+
+				Entry<Double, Double> entry = Worker.getMetricComponent(liG, null, null, None, nStart, A);
+				double dblRStart = entry.getKey().doubleValue();
+				entry = Worker.getMetricComponent(liG, null, null, None, nFinish, A);
+				double dblRFinish = entry.getKey().doubleValue();
+
+				dblSumOfSquaresOfRicciTensorsOverAllR +=
+				 dblSumOfSquaresOfRicciTensors * (dblRFinish - dblRStart) / (nFinish - nStart);
+			}
 		}
 
 		return dblSumOfSquaresOfRicciTensorsOverAllR;

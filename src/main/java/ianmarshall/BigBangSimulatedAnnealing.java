@@ -12,17 +12,17 @@ import org.slf4j.LoggerFactory;
 public class BigBangSimulatedAnnealing
 {
 	private static final Logger logger = LoggerFactory.getLogger(BigBangSimulatedAnnealing.class);
-	private static final DecimalFormat s_dfInteger;
-	private static final DecimalFormat s_dfFloat;
+	private static final DecimalFormat m_dfInteger;
+	private static final DecimalFormat m_dfFloat;
 
 	static
 	{
 		DecimalFormatSymbols dfSymbols = new DecimalFormatSymbols();
 		dfSymbols.setDecimalSeparator('.');
 		dfSymbols.setGroupingSeparator(' ');
-		s_dfInteger = new DecimalFormat("###,###",     dfSymbols);
-		s_dfFloat   = new DecimalFormat("###,###.###", dfSymbols);
-		s_dfFloat.setMinimumFractionDigits(1);
+		m_dfInteger = new DecimalFormat("###,###",     dfSymbols);
+		m_dfFloat   = new DecimalFormat("###,###.###", dfSymbols);
+		m_dfFloat.setMinimumFractionDigits(1);
 	}
 
 	public BigBangSimulatedAnnealing()
@@ -128,11 +128,11 @@ public class BigBangSimulatedAnnealing
 
 	public static String formatInteger(int n)
 	{
-		return s_dfInteger.format(n);
+		return m_dfInteger.format(n);
 	}
 
 	public static String formatDouble(double dbl)
 	{
-		return s_dfFloat.format(dbl);
+		return m_dfFloat.format(dbl);
 	}
 }

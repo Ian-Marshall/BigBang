@@ -16,21 +16,23 @@ public class MetricComponents
 
 	public enum MetricComponent
 	{
-		A, B, D
+		A, B, C, D
 	}
 
 	private double m_R = 0.0;    // The radius co-ordinate of the metric
 	private double m_T = 0.0;    // The time co-ordinate of the metric
 	private double m_A = 0.0;    // }
-	private double m_B = 0.0;    // } The component values of the metric
+	private double m_B = 0.0;    // } The component values
+	private double m_C = 0.0;    // } of the metric
 	private double m_D = 0.0;    // }
 
-	public MetricComponents(double r, double t, double a, double b, double d)
+	public MetricComponents(double r, double t, double a, double b, double c, double d)
 	{
 		m_R = r;
 		m_T = t;
 		m_A = a;
 		m_B = b;
+		m_C = c;
 		m_D = d;
 	}
 
@@ -74,6 +76,16 @@ public class MetricComponents
 		m_B = b;
 	}
 
+	public double getC()
+	{
+		return m_C;
+	}
+
+	public void setC(double c)
+	{
+		m_C = c;
+	}
+
 	public double getD()
 	{
 		return m_D;
@@ -109,6 +121,9 @@ public class MetricComponents
 			case B:
 				dblComponent = getB();
 				break;
+			case C:
+				dblComponent = getC();
+				break;
 			case D:
 				dblComponent = getD();
 				break;
@@ -130,6 +145,9 @@ public class MetricComponents
 			case B:
 				setB(dbl);
 				break;
+			case C:
+				setC(dbl);
+				break;
 			case D:
 				setD(dbl);
 				break;
@@ -140,7 +158,7 @@ public class MetricComponents
 
 	public MetricComponents copy()
 	{
-		return new MetricComponents(getR(), getT(), getA(), getB(), getD());
+		return new MetricComponents(getR(), getT(), getA(), getB(), getC(), getD());
 	}
 
 	/*
