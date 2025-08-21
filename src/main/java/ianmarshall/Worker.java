@@ -38,7 +38,7 @@ public class Worker implements Runnable
 		@Override
 		public void uncaughtException(Thread t, Throwable th)
 		{
-			m_WorkerResult = new WorkerResult(m_bProcessingCompleted, th, m_nRun, m_liG);
+			m_WorkerResult = new WorkerResult(m_bProcessingCompleted, th, m_nRun, m_madG);
 			m_bStopped = true;
 		}
 
@@ -135,7 +135,7 @@ public class Worker implements Runnable
 				m_bFirstRun = false;
 			}
 
-			List<MetricComponents> liGNew = m_saSimulatedAnnealing.neighbour(m_liG);
+			MetricAndDerivatives madNew = m_saSimulatedAnnealing.neighbour(m_madG);
 			List<MetricComponents> liGNewFirstDerivative = MetricComponents.deepCopyMetricComponents(m_liGFirstDerivative);
 			List<MetricComponents> liGNewSecondDerivative = MetricComponents.deepCopyMetricComponents(m_liGSecondDerivative);
 			calculateAllDifferentialsForAllValues(liGNew, liGNewFirstDerivative, liGNewSecondDerivative);
@@ -566,67 +566,6 @@ public class Worker implements Runnable
 		return mMetric.getMetricComponents(nRIndex, nTIndex);
 	}
 
-	/*
-	 * Calculate the Jacobian matrix (values) at the given point in space-time (the radius).
-	 * <br>
-	 * All of the list parameters must be not <code>null</code> and contain the
-	 * same number of elements for the same radius values.
-	 * This number of elements must be at least 5.
-	 * @param liG
-	 *   A list of the metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGFirstDerivative
-	 *   A list of first derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param liGSecondDerivative
-	 *   A list of second derivative metric tensor values, in order of ascending adjacent radius values.
-	 * @param nIndex
-	 *   The zero-based index of the metric component of the point in space-time (the radius) to be used.
-	 * @return
-	 *   The Jacobian matrix (values) at the given point in space-time (the radius).
-	 */
-	/*
-	private DoubleMatrix2D calculateJacobianMatrixValues(List<MetricComponents> liG,
-	 List<MetricComponents> liGFirstDerivative, List<MetricComponents> liGSecondDerivative, int nIndex)
-	{
-		Entry<Double, Double> entry = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative,
-		 None, nIndex, A);
-		double dblR = entry.getKey().doubleValue();
-		double dblA = entry.getValue().doubleValue();
-
-		double dblB = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, None, nIndex, B).
-		 getValue().doubleValue();
-
-		double dAdR = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, A)
-		 .getValue().doubleValue();
-
-		double dBdR = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, First, nIndex, B)
-		 .getValue().doubleValue();
-
-		double d2AdR2 = getMetricComponentOfDerivativeLevel(liG, liGFirstDerivative, liGSecondDerivative, Second, nIndex, A)
-		 .getValue().doubleValue();
-
-		double dR00dA = (1 / (4.0 * dblA * dblA * dblB)) * dAdR * dAdR;
-		double dR00dB = -((1 / (dblB * dblB * dblR)) * dAdR) + ((1 / (4.0 * dblA * dblB * dblB)) * dAdR * dAdR)
-		 + ((1 / (2.0 * dblB * dblB * dblB)) * dAdR * dBdR) - ((1 / (2.0 * dblB * dblB)) * d2AdR2);
-
-		double dR11dA = ((1 / (4.0 * dblA * dblA * dblB)) * dAdR * dBdR) + ((1 / (2.0 * dblA * dblA * dblA)) * dAdR * dAdR)
-		 - ((1 / (2.0 * dblA * dblA)) * d2AdR2);
-		double dR11dB = ((1 / (dblB * dblB * dblR)) * dBdR) + ((1 / (4.0 * dblA * dblB * dblB)) * dAdR * dBdR);
-
-		double dR22dA = ((dblR / (2 * dblA * dblA * dblB)) * dAdR);
-		double dR22dB = (1 / (dblB * dblB)) + ((dblR / (2 * dblA * dblB * dblB)) * dAdR)
-		 - ((dblR / (dblB * dblB * dblB)) * dBdR);
-
-		DoubleMatrix2D dmResult = DoubleFactory2D.dense.make(3, 2);
-		dmResult.set(0, 0, dR00dA);
-		dmResult.set(1, 0, dR11dA);
-		dmResult.set(2, 0, dR22dA);
-		dmResult.set(0, 1, dR00dB);
-		dmResult.set(1, 1, dR11dB);
-		dmResult.set(2, 1, dR22dB);
-		return dmResult;
-	}
-	*/
-
 	/**
 	 * Calculate the Ricci tensor values at the given point in space-time.
 	 * @param madG
@@ -641,10 +580,11 @@ public class Worker implements Runnable
 	 */
 	public static DoubleMatrix2D calculateRicciTensorValues(MetricAndDerivatives madG, int nRIndex, int nTIndex)
 	{
-		double dblR = getMetricComponent(madG, None, nRIndex, nTIndex, R, A).getKey().doubleValue();
-		Entry<Double, Double> entry = getMetricComponent(madG, None, nRIndex, nTIndex, T, A);
-		double dblT = entry.getKey().doubleValue();
+ // double dblT = getMetricComponent(madG, None, nRIndex, nTIndex, T, A).getKey().doubleValue();
+		Entry<Double, Double> entry = getMetricComponent(madG, None, nRIndex, nTIndex, R, A);
+		double dblR = entry.getKey().doubleValue();
 		double dblA = entry.getValue().doubleValue();
+
 		double dblB = getMetricComponent(madG, None, nRIndex, nTIndex, R, B).getValue().doubleValue();
 		double dblC = getMetricComponent(madG, None, nRIndex, nTIndex, R, C).getValue().doubleValue();
 		double dblD = getMetricComponent(madG, None, nRIndex, nTIndex, R, D).getValue().doubleValue();
@@ -660,17 +600,17 @@ public class Worker implements Runnable
 		double dDdT = getMetricComponent(madG, FirstTime, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
 		double d2AdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, A).getValue().doubleValue();
-		double d2BdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, B).getValue().doubleValue();
+ // double d2BdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, B).getValue().doubleValue();
 		double d2CdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, C).getValue().doubleValue();
-		double d2DdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, D).getValue().doubleValue();
+ // double d2DdR2 = getMetricComponent(madG, SecondRadius, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
-		double d2AdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, A).getValue().doubleValue();
+ // double d2AdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, A).getValue().doubleValue();
 		double d2BdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, B).getValue().doubleValue();
 		double d2CdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, C).getValue().doubleValue();
-		double d2DdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, D).getValue().doubleValue();
+ // double d2DdT2 = getMetricComponent(madG, SecondTime, nRIndex, nTIndex, R, D).getValue().doubleValue();
 
-		double d2AdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, A).getValue().doubleValue();
-		double d2BdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, B).getValue().doubleValue();
+ // double d2AdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, A).getValue().doubleValue();
+ // double d2BdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, B).getValue().doubleValue();
 		double d2CdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, C).getValue().doubleValue();
 		double d2DdRdT = getMetricComponent(madG, FirstRadiusFirstTime, nRIndex, nTIndex, R, D).getValue().doubleValue();
 

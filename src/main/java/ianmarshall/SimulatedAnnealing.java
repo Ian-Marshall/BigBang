@@ -3,7 +3,12 @@ package ianmarshall;
 import cern.colt.matrix.DoubleMatrix2D;
 
 import ianmarshall.MetricComponents.MetricComponent;
+import ianmarshall.MetricComponents.MetricPosition;
+
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.None;
 import static ianmarshall.MetricComponents.MetricComponent.A;
+import static ianmarshall.MetricComponents.MetricPosition.R;
+import static ianmarshall.MetricComponents.MetricPosition.T;
 
 import java.util.List;
 import java.util.Map.Entry;
@@ -24,6 +29,8 @@ public class SimulatedAnnealing
 {
 	private static final Logger logger = LoggerFactory.getLogger(SimulatedAnnealing.class);
 	private static final Random m_Random = new Random();    // Remove "static" for multi-instance use
+	private static final MetricPosition[] m_ampMetricPositions = MetricPosition.values();
+	private static final MetricComponent[] m_amcMetricComponents = MetricComponent.values();
 
 	private double m_dblNeighbourPeakScalingFactor = 0.0;
 	private double m_dblAcceptanceProbabilityScalingFactor = 0.0;
@@ -45,7 +52,7 @@ public class SimulatedAnnealing
 	 * Calculate the energy of the state space, which is represented by the supplied metric tensor components
 	 * and their derivatives.
 	 * @param madG
-	 *   The metric tensor components and its derivatives.
+	 *   The metric tensor components and their derivatives.
 	 * @param nRun
 	 *   The number of runs already executed. A value of <code>0</code> means that no run has yet been executed.
 	 * @return
@@ -59,18 +66,35 @@ public class SimulatedAnnealing
 
 		for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
 		{
+			final int nRIndexStart;
+			final int nRIndexFinish;
+			if (nRIndex == 0)
+			{
+				nRIndexStart = nRIndex;        // Forward difference for the first point
+				nRIndexFinish = nRIndexStart + 1;
+			}
+			else if (nRIndex < nRadiusElements - 1)
+			{
+				nRIndexStart = nRIndex - 1;    // Central difference for an internal point
+				nRIndexFinish = nRIndexStart + 2;
+			}
+			else
+			{
+				nRIndexStart = nRIndex - 1;    // Backward difference for the last point
+				nRIndexFinish = nRIndexStart + 1;
+			}
+
 			for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
 			{
-				// 3 rows by 1 column
-				DoubleMatrix2D dmRicci = Worker.calculateRicciTensorValues(madG, nRIndex, nTIndex);
+				DoubleMatrix2D dmRicci = Worker.calculateRicciTensorValues(madG, nRIndex, nTIndex);    // 4 rows by 1 column
 
 		 // boolean bLog = (nRun <= 3) && ((i == 0) || (i == 3));
 				boolean bLog = false;
 
 				if (bLog)
 				{
-					String sMsg = String.format("%n  nRun = %d, i = %d: dmRicci has elements:%n%s .%n",
-					nRun, i, dmRicci.toString());
+					String sMsg = String.format("%n  nRun = %d, nRIndex = %d, nTIndex = %d: dmRicci has elements:%n%s .%n",
+					nRun, nRIndex, nTIndex, dmRicci.toString());
 					logger.info(sMsg);
 				}
 
@@ -82,62 +106,74 @@ public class SimulatedAnnealing
 					dblSumOfSquaresOfRicciTensors += dblRicciTensor * dblRicciTensor;
 				}
 
-				final int nStart;
-				final int nFinish;
-				if (i == 0)
+				final int nTIndexStart;
+				final int nTIndexFinish;
+				if (nTIndex == 0)
 				{
-					nStart = i;        // Forward difference for the first point
-					nFinish = nStart + 1;
+					nTIndexStart = nTIndex;        // Forward difference for the first point
+					nTIndexFinish = nTIndexStart + 1;
 				}
-				else if (i < nSize - 1)
+				else if (nTIndex < nTimeElements - 1)
 				{
-					nStart = i - 1;    // Central difference for an internal point
-					nFinish = nStart + 2;
+					nTIndexStart = nTIndex - 1;    // Central difference for an internal point
+					nTIndexFinish = nTIndexStart + 2;
 				}
 				else
 				{
-					nStart = i - 1;    // Backward difference for the last point
-					nFinish = nStart + 1;
+					nTIndexStart = nTIndex - 1;    // Backward difference for the last point
+					nTIndexFinish = nTIndexStart + 1;
 				}
 
-				Entry<Double, Double> entry = Worker.getMetricComponent(liG, null, null, None, nStart, A);
-				double dblRStart = entry.getKey().doubleValue();
-				entry = Worker.getMetricComponent(liG, null, null, None, nFinish, A);
-				double dblRFinish = entry.getKey().doubleValue();
+				double dblRStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   R, A).getKey()
+				 .doubleValue();
+				double dblTStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   T, A).getKey()
+				 .doubleValue();
+				double dblRFinish = Worker.getMetricComponent(madG, None, nRIndexFinish, nTIndexFinish, R, A).getKey()
+				 .doubleValue();
+				double dblTFinish = Worker.getMetricComponent(madG, None, nRIndexFinish, nTIndexFinish, T, A).getKey()
+				 .doubleValue();
 
-				dblSumOfSquaresOfRicciTensorsOverAllR +=
-				 dblSumOfSquaresOfRicciTensors * (dblRFinish - dblRStart) / (nFinish - nStart);
+				// Add to the all-squares total with an appropriate weighting
+				dblSumOfSquaresOfRicciTensorsOverAllRAndT += dblSumOfSquaresOfRicciTensors
+				 * ((dblRFinish - dblRStart) * (dblTFinish - dblTStart))
+				 / ((nRIndexFinish - nRIndexStart) * (nTIndexFinish - nTIndexStart));
 			}
 		}
 
-		return dblSumOfSquaresOfRicciTensorsOverAllR;
+		return dblSumOfSquaresOfRicciTensorsOverAllRAndT;
 	}
 
 	/**
 	 * The candidate generator procedure.
-	 * @param liG
-	 *   The tensor values, with metric components for each value of radius.
+	 * @param madG
+	 *   The metric tensor components and their derivatives.
 	 * @return
-	 *   The tensor values of the candidate, with metric components for each value of radius.
+	 *   The metric tensor components of the candidate for each value of radius and time.
+	 *   The derivatives have been initialised but not calculated.
 	 */
-	public List<MetricComponents> neighbour(List<MetricComponents> liG)
+	public MetricAndDerivatives neighbour(MetricAndDerivatives madG)
 	{
-		List<MetricComponents> liGResult = MetricComponents.deepCopyMetricComponents(liG);
+		MetricAndDerivatives madResult = madG.copy();
+		MetricPosition mp = randomMetricPosition();
+		MetricComponent mc = randomMetricComponent();
 
-		int nSize = liGResult.size();
- // double dblStandardDeviationMax = nSize / 4.0;
+		int nSize;
+		switch (mp)
+		{
+			case R:
+				nSize = madG.getNRadiusElements();
+				break;
+			case T:
+				nSize = madG.getNTimeElements();
+				break;
+		}
+
 		int nIndexCentre = m_Random.nextInt(nSize);
-
- // double dblStandardDeviation = Math.floor(Math.random() * dblStandardDeviationMax);
- // dblStandardDeviation = Math.max(0.1, dblStandardDeviation);
-		double dblStandardDeviation = 1.0;
+		double dblStandardDeviationMax = nSize / 10.0;
+		double dblStandardDeviation = Math.floor(Math.random() * dblStandardDeviationMax);
 
 		// Equally likely between -m_dblNeighbourPeakScalingFactor and +m_dblNeighbourPeakScalingFactor inclusive
 		double dblDeltaPeak = m_dblNeighbourPeakScalingFactor * ((2.0 * Math.random()) - 1.0);
-
-		MetricComponent[] amcMetricComponents = MetricComponent.values();
-		int nMCIndex = m_Random.nextInt(amcMetricComponents.length);
-		MetricComponent mc = amcMetricComponents[nMCIndex];
 
  // m_sLogMessage = String.format("SimulatedAnnealing.neighbour(...):"
  //  + "%n  nIndexCentre         = %d,"
@@ -145,14 +181,23 @@ public class SimulatedAnnealing
  //  + "%n  dblDeltaPeak         = %f.",
  //  nIndexCentre, dblStandardDeviation, dblDeltaPeak);
 
-		for (int i = 0; i < liGResult.size(); i++)
+		for (int i = 0; i < nSize; i++)
 		{
 			double dblExponent = (i - nIndexCentre) / dblStandardDeviation;
 			double dblDelta = dblDeltaPeak * Math.exp(-dblExponent * dblExponent);
 
+			/*
 			double dblMC = Worker.getMetricComponent(liGResult, null, null, None, i, mc)
 			 .getValue().doubleValue();
 			Worker.setMetricComponent(liGResult, null, null, None, i, mc, dblMC + dblDelta);
+			*/
+
+	 // double dblRStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   R, A).getKey().doubleValue();
+			double dblMC  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart, mp, mc).getKey().doubleValue();
+
+
+
+
 		}
 
 		return liGResult;
@@ -228,4 +273,16 @@ public class SimulatedAnnealing
 		return sResult;
 	}
 	*/
+
+	private static MetricPosition randomMetricPosition()
+	{
+		int nMPIndex = m_Random.nextInt(m_ampMetricPositions.length);
+		return m_ampMetricPositions[nMPIndex];
+	}
+
+	private static MetricComponent randomMetricComponent()
+	{
+		int nMCIndex = m_Random.nextInt(m_amcMetricComponents.length);
+		return m_amcMetricComponents[nMCIndex];
+	}
 }

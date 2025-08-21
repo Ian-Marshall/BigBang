@@ -1,21 +1,18 @@
 package ianmarshall;
 
-import java.util.Collections;
-import java.util.List;
-
 public class WorkerResult
 {
 	private boolean m_bProcessingCompleted = false;
 	private Throwable m_thThrowable = null;
 	private int m_nRun = 0;
-	private List<MetricComponents> m_liG = null;
+	private MetricAndDerivatives m_madG = null;
 
-	public WorkerResult(boolean bProcessingCompleted, Throwable thThrowable, int nRun, List<MetricComponents> liG)
+	public WorkerResult(boolean bProcessingCompleted, Throwable thThrowable, int nRun, MetricAndDerivatives madG)
 	{
 		m_bProcessingCompleted = bProcessingCompleted;
 		m_thThrowable = thThrowable;
 		m_nRun = nRun;
-		m_liG = MetricComponents.deepCopyMetricComponents(liG);
+		m_madG = madG.copy();
 	}
 
 	public boolean getProcessingCompleted()
@@ -33,8 +30,8 @@ public class WorkerResult
 		return m_nRun;
 	}
 
-	public List<MetricComponents> getMetricComponentsList()
+	public MetricAndDerivatives getMetricAndDerivatives()
 	{
-		return Collections.unmodifiableList(m_liG);
+		return m_madG;
 	}
 }
