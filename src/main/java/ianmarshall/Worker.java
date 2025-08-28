@@ -136,11 +136,8 @@ public class Worker implements Runnable
 			}
 
 			MetricAndDerivatives madNew = m_saSimulatedAnnealing.neighbour(m_madG);
-			List<MetricComponents> liGNewFirstDerivative = MetricComponents.deepCopyMetricComponents(m_liGFirstDerivative);
-			List<MetricComponents> liGNewSecondDerivative = MetricComponents.deepCopyMetricComponents(m_liGSecondDerivative);
-			calculateAllDifferentialsForAllValues(liGNew, liGNewFirstDerivative, liGNewSecondDerivative);
-			double dblEnergyNew = m_saSimulatedAnnealing.energy(liGNew, liGNewFirstDerivative, liGNewSecondDerivative,
-			 m_nRun);
+			calculateAllDifferentialsForAllValues(madNew);
+			double dblEnergyNew = m_saSimulatedAnnealing.energy(madNew, m_nRun);
 			double dblTemperature = m_saSimulatedAnnealing.temperature(m_nRun, m_nRuns);
 			double dblProbability = m_saSimulatedAnnealing.acceptanceProbability(m_dblEnergyCurrent, dblEnergyNew,
 			 dblTemperature);
@@ -148,54 +145,36 @@ public class Worker implements Runnable
 			String sLogEntry = null;
 	 // bAcceptMove = false;    // Delete this line
 
+			String sHighlightStart = bAcceptMove ? "    ***  ": " ";
+			String sHighlightFinish = bAcceptMove ? "  ***": "";
+			String sAction = bAcceptMove ? "accepted" : "rejected";
+
+			if (bAcceptMove || (dblProbability >= 0.5))
+				sLogEntry = String.format(
+					"Run number %s:%s%s move from energy %f to %f at temperature %f with probability %.5f.%s",
+					BigBangSimulatedAnnealing.formatInteger(m_nRun), sHighlightStart, sAction, m_dblEnergyCurrent, dblEnergyNew,
+					dblTemperature, dblProbability, sHighlightFinish);
+
 			if (bAcceptMove)
 			{
 		 // if (Math.random() < DBL_SUCCESS_LOG_PROBABILITY)
 		 // {
-					sLogEntry = String.format("Run number %s:"
-					 + "    ***  Accepted move from energy %f to %f at temperature %f with probability %.5f.  ***",
-					 BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent, dblEnergyNew, dblTemperature,
-					 dblProbability);
-
-					int nStartLength = s_sbMoveLog.length();
-					s_sbMoveLog.append(String.format("%n  run %d: %s", m_nRun, sLogEntry));
-
-					if (nStartLength == 0)
-					{
-						String sRemove = String.format("%n");
-						int nLengthRemove = sRemove.length();
-						s_sbMoveLog.delete(0, nLengthRemove);
-					}
+					String sFormat = s_sbMoveLog.length() > 0 ? "%n  run %d: %s" : "  run %d: %s";
+					s_sbMoveLog.append(String.format(sFormat, m_nRun, sLogEntry));
 		 // }
 
-				m_liG = liGNew;
-				m_liGFirstDerivative = liGNewFirstDerivative;
-				m_liGSecondDerivative = liGNewSecondDerivative;
+				m_madG = madNew;
 				m_dblEnergyCurrent = dblEnergyNew;
 
 		 // String sLogMessage = m_saSimulatedAnnealing.popLatestLogMessage();
 		 // logger.info(sLogMessage);
-			}
-			else if (dblProbability >= 0.5)
-			{
-				sLogEntry = String.format("Run number %s:"
-				 + " rejected move from energy %f to %f with probability %.5f.",
-				 BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent, dblEnergyNew, dblProbability);
-
-		 // sLogEntry = String.format("%n***  Remove the setting of bAcceptMove to false.  ***");
 			}
 
 			if (sLogEntry == null)
 				sLogEntry = String.format("Run number %s: (pre-move) energy = %f.",
 				 BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent);
 
-			if (sLogEntry != null)
-			{
-				logger.info(sLogEntry);
-		 // logger.info(String.format("Completed run number %s with current energy %f.",
-		 //  BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent));
-			}
-
+			logger.info(sLogEntry);
 	 // logger.info(String.format("Completed run number %s with current energy %f.",
 	 //  BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent));
 		}
@@ -212,7 +191,7 @@ public class Worker implements Runnable
 		else
 			logger.info("Stopped before all processing completed.");
 
-		m_WorkerResult = new WorkerResult(m_bProcessingCompleted, null, m_nRun, m_liG);
+		m_WorkerResult = new WorkerResult(m_bProcessingCompleted, null, m_nRun, m_madG);
 		m_bStopped = true;
 	}
 

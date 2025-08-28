@@ -10,7 +10,6 @@ import static ianmarshall.MetricComponents.MetricComponent.A;
 import static ianmarshall.MetricComponents.MetricPosition.R;
 import static ianmarshall.MetricComponents.MetricPosition.T;
 
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.Random;
 
@@ -27,8 +26,9 @@ import org.slf4j.LoggerFactory;
  */
 public class SimulatedAnnealing
 {
-	private static final Logger logger = LoggerFactory.getLogger(SimulatedAnnealing.class);
-	private static final Random m_Random = new Random();    // Remove "static" for multi-instance use
+	private static final double DBL_EQUALITY_TOLERANCE = 1.0e-12;
+	private static final Logger m_logger = LoggerFactory.getLogger(SimulatedAnnealing.class);
+	private static final Random m_random = new Random();    // Remove "static" for multi-instance use
 	private static final MetricPosition[] m_ampMetricPositions = MetricPosition.values();
 	private static final MetricComponent[] m_amcMetricComponents = MetricComponent.values();
 
@@ -95,7 +95,7 @@ public class SimulatedAnnealing
 				{
 					String sMsg = String.format("%n  nRun = %d, nRIndex = %d, nTIndex = %d: dmRicci has elements:%n%s .%n",
 					nRun, nRIndex, nTIndex, dmRicci.toString());
-					logger.info(sMsg);
+					m_logger.info(sMsg);
 				}
 
 				double dblSumOfSquaresOfRicciTensors = 0.0;
@@ -157,23 +157,27 @@ public class SimulatedAnnealing
 		MetricPosition mp = randomMetricPosition();
 		MetricComponent mc = randomMetricComponent();
 
-		int nSize;
+		int nSizeVarying = 0;
+		int nSizeFixed = 0;
 		switch (mp)
 		{
 			case R:
-				nSize = madG.getNRadiusElements();
+				nSizeVarying = madResult.getNRadiusElements();
+				nSizeFixed = madResult.getNTimeElements();
 				break;
 			case T:
-				nSize = madG.getNTimeElements();
+				nSizeVarying = madResult.getNTimeElements();
+				nSizeFixed = madResult.getNRadiusElements();
 				break;
 		}
 
-		int nIndexCentre = m_Random.nextInt(nSize);
-		double dblStandardDeviationMax = nSize / 10.0;
-		double dblStandardDeviation = Math.floor(Math.random() * dblStandardDeviationMax);
+		int nIndexCentre = m_random.nextInt(nSizeVarying);
+		int nIndexFixed = m_random.nextInt(nSizeFixed);
+		double dblStandardDeviationMax = nSizeVarying / 10.0;
+		double dblStandardDeviation = m_random.nextDouble() * dblStandardDeviationMax;
 
 		// Equally likely between -m_dblNeighbourPeakScalingFactor and +m_dblNeighbourPeakScalingFactor inclusive
-		double dblDeltaPeak = m_dblNeighbourPeakScalingFactor * ((2.0 * Math.random()) - 1.0);
+		double dblDeltaPeak = m_dblNeighbourPeakScalingFactor * m_random.nextDouble(-1.0, 1.0);
 
  // m_sLogMessage = String.format("SimulatedAnnealing.neighbour(...):"
  //  + "%n  nIndexCentre         = %d,"
@@ -181,26 +185,36 @@ public class SimulatedAnnealing
  //  + "%n  dblDeltaPeak         = %f.",
  //  nIndexCentre, dblStandardDeviation, dblDeltaPeak);
 
-		for (int i = 0; i < nSize; i++)
+		for (int i = 0; i < nSizeVarying; i++)
 		{
+			int nRIndex = -1;
+			int nTIndex = -1;
+			switch (mp)
+			{
+				case R:
+					nRIndex = i;
+					nTIndex = nIndexFixed;
+					break;
+				case T:
+					nRIndex = nIndexFixed;
+					nTIndex = i;
+					break;
+			}
+
 			double dblExponent = (i - nIndexCentre) / dblStandardDeviation;
 			double dblDelta = dblDeltaPeak * Math.exp(-dblExponent * dblExponent);
 
-			/*
-			double dblMC = Worker.getMetricComponent(liGResult, null, null, None, i, mc)
-			 .getValue().doubleValue();
-			Worker.setMetricComponent(liGResult, null, null, None, i, mc, dblMC + dblDelta);
-			*/
-
-	 // double dblRStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   R, A).getKey().doubleValue();
-			double dblMC  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart, mp, mc).getKey().doubleValue();
-
-
-
-
+			if (Math.abs(dblDelta) >= DBL_EQUALITY_TOLERANCE)
+			{
+				Entry<Double, Double> entry = Worker.getMetricComponent(madResult, None, nRIndex, nTIndex, mp, mc);
+				double dblValue = entry.getValue().doubleValue();
+				entry.setValue(Double.valueOf(dblValue + dblDelta));
+			}
+			else if (i > nIndexCentre)
+				break;    // There are no more significant changes to make
 		}
 
-		return liGResult;
+		return madResult;
 	}
 
 	/**
@@ -225,7 +239,7 @@ public class SimulatedAnnealing
 		else if (dblTemperature <= 0.0)
 			result = 0.0;
 		else    // exp(-k(Enew - E)/T)
-			result = Math.exp(-m_dblAcceptanceProbabilityScalingFactor *(dblEnergyNew - dblEnergyCurrent) / dblTemperature);
+			result = Math.exp(-m_dblAcceptanceProbabilityScalingFactor * (dblEnergyNew - dblEnergyCurrent) / dblTemperature);
 
 		return result;
 	}
@@ -247,12 +261,7 @@ public class SimulatedAnnealing
 		double dblFactor = 1.0 - (((double)(nIteration - 1)) / m_dblTemperatureDivisor);
 
 		if (dblFactor > 0.0)
-		{
-			result = m_dblTemperatureScalingFactor * Math.pow(dblFactor, 4.0);
-
-			if (result < 0.0)
-				result = 0.0;
-		}
+			result = Math.max(m_dblTemperatureScalingFactor * Math.pow(dblFactor, 4.0), 0.0);
 
  // if (result <= 4.0)
  // 	result = 4.0;
@@ -276,13 +285,13 @@ public class SimulatedAnnealing
 
 	private static MetricPosition randomMetricPosition()
 	{
-		int nMPIndex = m_Random.nextInt(m_ampMetricPositions.length);
-		return m_ampMetricPositions[nMPIndex];
+		int nIndex = m_random.nextInt(m_ampMetricPositions.length);
+		return m_ampMetricPositions[nIndex];
 	}
 
 	private static MetricComponent randomMetricComponent()
 	{
-		int nMCIndex = m_Random.nextInt(m_amcMetricComponents.length);
-		return m_amcMetricComponents[nMCIndex];
+		int nIndex = m_random.nextInt(m_amcMetricComponents.length);
+		return m_amcMetricComponents[nIndex];
 	}
 }
