@@ -28,10 +28,10 @@ public class Metric
 
 		for (int r = 0; r < m_nRadiusElements; r++)
 		{
-			double dblRadius = Double.valueOf(liRadii.get(r));
+			double dblRadius = liRadii.get(r).doubleValue();
 
 			for (int t = 0; t < m_nTimeElements; t++)
-				m_aMetricComponents[r][t] = new MetricComponents(dblRadius, Double.valueOf(liTimes.get(t)), 0.0, 0.0, 0.0, 0.0);
+				m_aMetricComponents[r][t] = new MetricComponents(dblRadius, liTimes.get(t).doubleValue(), 0.0, 0.0, 0.0, 0.0);
 		}
 	}
 

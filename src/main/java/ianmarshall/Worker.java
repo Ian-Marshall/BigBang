@@ -20,7 +20,6 @@ import static ianmarshall.MetricComponents.MetricPosition.T;
 
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map.Entry;
 
@@ -46,8 +45,8 @@ public class Worker implements Runnable
 
 	private static final double c = 3.0e8;    // The speed of light in m/s
 	private static final double c2 = c * c;
-	// private static final double DBL_SUCCESS_LOG_PROBABILITY = 0.001;
-	private static final Logger logger = LoggerFactory.getLogger(Worker.class);
+//private static final double DBL_SUCCESS_LOG_PROBABILITY = 0.001;
+	private static final Logger s_logger = LoggerFactory.getLogger(Worker.class);
 	private static final StringBuilder s_sbMoveLog = new StringBuilder();    // Refactor this for multi-instance use
 	private int m_nRun = 0;
 	private int m_nRuns = 0;
@@ -89,7 +88,7 @@ public class Worker implements Runnable
 	public void stopExecution()
 	{
 		m_bStopping = true;
-		logger.info(String.format("Stopping run number %s...", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
+		s_logger.info(String.format("Stopping run number %s...", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
 	}
 
 	/**
@@ -120,7 +119,7 @@ public class Worker implements Runnable
 		while ((!m_bStopping) && (m_nRun < m_nRuns))
 		{
 			m_nRun++;
-			logger.info(String.format("Started run number %s.", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
+			s_logger.info(String.format("Started run number %s.", BigBangSimulatedAnnealing.formatInteger(m_nRun)));
 
 			if (m_bFirstRun)
 			{
@@ -174,22 +173,22 @@ public class Worker implements Runnable
 				sLogEntry = String.format("Run number %s: (pre-move) energy = %f.",
 				 BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent);
 
-			logger.info(sLogEntry);
+			s_logger.info(sLogEntry);
 	 // logger.info(String.format("Completed run number %s with current energy %f.",
 	 //  BigBangSimulatedAnnealing.formatInteger(m_nRun), m_dblEnergyCurrent));
 		}
 
-		logger.info(String.format("Move log is:%n%s", s_sbMoveLog));
+		s_logger.info(String.format("Move log is:%n%s", s_sbMoveLog));
 		reportFinalTensorValues();
 
 		if (m_nRun >= m_nRuns)
 		{
 			s_sbMoveLog.setLength(0);
 			m_bProcessingCompleted = true;
-			logger.info("All processing has been completed.");
+			s_logger.info("All processing has been completed.");
 		}
 		else
-			logger.info("Stopped before all processing completed.");
+			s_logger.info("Stopped before all processing completed.");
 
 		m_WorkerResult = new WorkerResult(m_bProcessingCompleted, null, m_nRun, m_madG);
 		m_bStopped = true;
@@ -259,8 +258,8 @@ public class Worker implements Runnable
 		}
 
 		MetricAndDerivatives madResult = buildMetricAndDerivatives(liRadii, liTimes);
-		logger.info(sbLog.toString());
-		logger.info("The metric components have been initialised.");
+		s_logger.info(sbLog.toString());
+		s_logger.info("The metric components have been initialised.");
 		return madResult;
 	}
 
@@ -704,40 +703,44 @@ public class Worker implements Runnable
 
 	private void reportFinalTensorValues()
 	{
-		logger.info(String.format("The metric components (in the format \"index, r, A, B\") after the final run are:"));
-		StringBuilder sbLog = new StringBuilder();
+		final boolean B_REPORT_FINAL_TENSOR_VALUES_IN_CSV_FORMAT = false;
 
-		// For use in CSV format
- // sbLog.append(String.format(
- // 	 "%n      i,                  R,                  A,                  B,              dA/dR,              dB/dR,            d2A/dR2,            d2B/dR2"
- //  + "%n"));
+		s_logger.info(String.format(
+		 "The metric components (in the format \"tIndex, rIndex, t, r, A, B, C, D\") after the final run are:"));
 
-		sbLog.append(String.format(
-			 "%n      i                   R                   A                   B               dA/dR               dB/dR             d2A/dR2             d2B/dR2"
-		 + "%n  -----  ------------------  ------------------  ------------------  ------------------  ------------------  ------------------  ------------------"));
+		String sFormatHeader;
+		if (B_REPORT_FINAL_TENSOR_VALUES_IN_CSV_FORMAT)
+			sFormatHeader =
+			   "%n  tIndex, rIndex,                  t,                  r,                  A,                  B,                  C,                  D"
+			 + "%n";
+		else
+			sFormatHeader =
+			   "%n  tIndex  rIndex                   t                   r                   A                   B                   C                   D"
+			 + "%n  ------  ------  ------------------  ------------------  ------------------  ------------------  ------------------  ------------------";
 
-		for (int i = 0; i < m_liG.size(); i++)
-		{
-			Entry<Double, Double> entry = getMetricComponent(m_liG, null, null, None, i, A);
-			double dblR = entry.getKey().doubleValue();
-			double dblA = entry.getValue().doubleValue();
-			double dblB = getMetricComponent(m_liG, null, null, None, i, B).getValue().doubleValue();
+		StringBuilder sbLog = new StringBuilder(String.format(sFormatHeader));
 
-			double dAdR = getMetricComponent(
-			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, First, i, A).getValue().doubleValue();
-			double dBdR = getMetricComponent(
-			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, First, i, B).getValue().doubleValue();
-			double d2AdR2 = getMetricComponent(
-			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, Second, i, A).getValue().doubleValue();
-			double d2BdR2 = getMetricComponent(
-			 m_liG, m_liGFirstDerivative, m_liGSecondDerivative, Second, i, B).getValue().doubleValue();
+		String sFormat;
+		if (B_REPORT_FINAL_TENSOR_VALUES_IN_CSV_FORMAT)
+			sFormat = "%n  %6d, %6d, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f";
+		else
+			sFormat = "%n  %6d  %6d  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f";
 
-	 // String sFormat = "%n  %5d, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f";    // For use in CSV format
-			String sFormat = "%n  %5d  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f";
+		int nTimeElements   = m_madG.getNTimeElements();
+		int nRadiusElements = m_madG.getNRadiusElements();
 
-			sbLog.append(String.format(sFormat, i, dblR, dblA, dblB, dAdR, dBdR, d2AdR2, d2BdR2));
-		}
+		for (int t = 0; t < nTimeElements; t++)
+			for (int r = 0; r < nRadiusElements; r++)
+			{
+				double dblT = getMetricComponent(m_madG, None, r, t, T, A).getKey().doubleValue();
+				double dblR = getMetricComponent(m_madG, None, r, t, R, A).getKey().doubleValue();
+				double dblA = getMetricComponent(m_madG, None, r, t, R, A).getValue().doubleValue();
+				double dblB = getMetricComponent(m_madG, None, r, t, R, B).getValue().doubleValue();
+				double dblC = getMetricComponent(m_madG, None, r, t, R, C).getValue().doubleValue();
+				double dblD = getMetricComponent(m_madG, None, r, t, R, D).getValue().doubleValue();
+				sbLog.append(String.format(sFormat, t, r, dblT, dblR, dblA, dblB, dblC, dblD));
+			}
 
-		logger.info(sbLog.toString());
+		s_logger.info(sbLog.toString());
 	}
 }

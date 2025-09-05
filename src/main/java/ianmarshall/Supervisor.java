@@ -7,7 +7,6 @@ import static ianmarshall.Supervisor.ExecutionCommand.STOP;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -166,8 +165,8 @@ public class Supervisor
 						else if (ecKey == CONTINUE)
 						{
 							int nRun = wrWorkerResult.getRun();
-							List<MetricComponents> liG = wrWorkerResult.getMetricComponentsList();
-							worker = new Worker(m_spStartParameters, nRun, liG);
+							MetricAndDerivatives madG = wrWorkerResult.getMetricAndDerivatives();
+							worker = new Worker(m_spStartParameters, nRun, madG);
 							thread = new Thread(worker);
 							thread.setUncaughtExceptionHandler(worker.getWorkerUncaughtExceptionHandler());
 							thread.start();
