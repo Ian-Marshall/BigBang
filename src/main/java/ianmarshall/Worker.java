@@ -207,11 +207,11 @@ public class Worker implements Runnable
 		String sIndent = " ".repeat(72);
 
 		sbLog.append(String.format(
-			 "%n%1$sindex                   T                   R                   A                   B                   D"
-		 + "%n%1$s-----  ------------------  ------------------  ------------------  ------------------  ------------------",
+		   "%n%1$sTIndex  RIndex                   T                   R                   A                   B                   C                   D"
+		 + "%n%1$s------  ------  ------------------  ------------------  ------------------  ------------------  ------------------  ------------------",
 		 sIndent));
 
-		String sFormat = "%n" + sIndent + "%5d  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f";
+		String sFormat = "%n" + sIndent + "%6d  %6d  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f";
 
 		final double DBL_R_MIN = 1.01;
 		final double DBL_R_MAX = 100.0;
@@ -222,7 +222,6 @@ public class Worker implements Runnable
 
 		double dblR = DBL_R_MIN;
 		double dblT = DBL_T_MIN;
-		int i = 0;
 		boolean bLoop = true;
 		boolean bOneMoreLoop = false;
 
@@ -231,15 +230,8 @@ public class Worker implements Runnable
 			if (bOneMoreLoop)
 				bLoop = false;
 
-			double dblA =  1.0;
-			double dblB =  -1.0;
-			double dblD =  1.0;    // Let us try first having D positive (it could turn out to be negative instead)
 			liRadii.add(dblR);
 			liTimes.add(dblT);
-
-			if ((i >= 662) || ((i % 100) == 0))
-				sbLog.append(String.format(sFormat, i, dblT, dblR, dblA, dblB, dblD));
-
 			double dblRNew = ((dblR  - 1.0) * DBL_STEP_FACTOR_RADIUS) + 1.0;
 
 			if (dblRNew < DBL_R_MAX)
@@ -254,10 +246,43 @@ public class Worker implements Runnable
 				bLoop = false;
 
 			dblT += DBL_STEP_TIME;
-			i++;
 		}
 
 		MetricAndDerivatives madResult = buildMetricAndDerivatives(liRadii, liTimes);
+		int nRadiusElements = madResult.getNRadiusElements();
+		int nTimeElements = madResult.getNTimeElements();
+
+		double dblA =  1.0;
+		double dblB =  -1.0;
+		double dblC =  -1.0;
+		double dblD =  1.0;    // Let us try first having D positive (it could turn out to be negative instead)
+
+		for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
+			for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
+			{
+				Entry<Double, Double> entry = getMetricComponent(madResult, None, nRIndex, nTIndex, T, A);
+				dblT = entry.getKey().doubleValue();
+				entry = getMetricComponent(madResult, None, nRIndex, nTIndex, R, A);
+				dblR= entry.getKey().doubleValue();
+				double dblA1 = entry.getValue().doubleValue();
+
+				setMetricComponent(madResult, None, nRIndex, nTIndex, R, A, dblA);
+
+				entry = getMetricComponent(madResult, None, nRIndex, nTIndex, R, A);
+				double dblA2 = entry.getValue().doubleValue();
+
+				if ((nRIndex == 0) && (nTIndex == 0))
+					s_logger.debug(String.format("At (nRIndex, nTIndex) = (%d, %d)): dblA changed from %, .6f to %, .6f.",
+					 nRIndex, nTIndex, dblA1, dblA2));
+
+				setMetricComponent(madResult, None, nRIndex, nTIndex, R, B, dblB);
+				setMetricComponent(madResult, None, nRIndex, nTIndex, R, C, dblC);
+				setMetricComponent(madResult, None, nRIndex, nTIndex, R, D, dblD);
+
+				if ((nTIndex == 331) && (((nRIndex % 100) == 0) || (nRIndex >= 662)))
+					sbLog.append(String.format(sFormat, nTIndex, nRIndex, dblT, dblR, dblA, dblB, dblC, dblD));
+			}
+
 		s_logger.info(sbLog.toString());
 		s_logger.info("The metric components have been initialised.");
 		return madResult;

@@ -7,12 +7,12 @@ import cern.colt.matrix.linalg.Algebra;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import org.junit.After;
-import org.junit.AfterClass;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import static org.junit.Assert.*;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class MatrixTest
 {
@@ -55,18 +55,18 @@ public class MatrixTest
 	{
 	}
 
-	@BeforeClass
+	@BeforeAll
 	public static void setUpClass()
 	{
 		s_algebra = new Algebra();
 	}
 
-	@AfterClass
+	@AfterAll
 	public static void tearDownClass()
 	{
 	}
 
-	@Before
+	@BeforeEach
 	public void setUp()
 	{
 		m_dm3x3 = DoubleFactory2D.dense.make(M_ADBL_3_X_3);
@@ -82,7 +82,7 @@ public class MatrixTest
 		}
 	}
 
-	@After
+	@AfterEach
 	public void tearDown()
 	{
 	}
