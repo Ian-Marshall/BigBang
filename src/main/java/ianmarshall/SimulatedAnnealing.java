@@ -10,7 +10,7 @@ import static ianmarshall.MetricComponents.MetricComponent.A;
 import static ianmarshall.MetricComponents.MetricPosition.R;
 import static ianmarshall.MetricComponents.MetricPosition.T;
 
-import java.util.Map.Entry;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Random;
 
 import org.slf4j.Logger;
@@ -206,9 +206,10 @@ public class SimulatedAnnealing
 
 			if (Math.abs(dblDelta) >= DBL_EQUALITY_TOLERANCE)
 			{
-				Entry<Double, Double> entry = Worker.getMetricComponent(madResult, None, nRIndex, nTIndex, mp, mc);
+				MetricComponents mcMetricComponents = Worker.getMetricComponents(madResult, None, nRIndex, nTIndex);
+				SimpleImmutableEntry<Double, Double> entry = mcMetricComponents.getComponent(mp, mc);
 				double dblValue = entry.getValue().doubleValue();
-				entry.setValue(Double.valueOf(dblValue + dblDelta));
+				mcMetricComponents.setComponent(mc, dblValue + dblDelta);
 			}
 			else if (i > nIndexCentre)
 				break;    // There are no more significant changes to make

@@ -1,7 +1,6 @@
 package ianmarshall;
 
-import java.util.AbstractMap.SimpleEntry;
-import java.util.Map.Entry;
+import java.util.AbstractMap.SimpleImmutableEntry;
 
 /**
  * This class represents an element of the metric or fundamental tensor at a point in space-time.
@@ -96,7 +95,7 @@ public class MetricComponents
 		m_D = d;
 	}
 
-	public Entry<Double, Double> getComponent(MetricPosition mp, MetricComponent mc)
+	public SimpleImmutableEntry<Double, Double> getComponent(MetricPosition mp, MetricComponent mc)
 	{
 		double dblPosition;
 		switch (mp)
@@ -132,7 +131,7 @@ public class MetricComponents
 				throw new IllegalArgumentException(String.format("Metric component \"%s\" not found.", sMC));
 		}
 
-		return new SimpleEntry<>(Double.valueOf(dblPosition), Double.valueOf(dblComponent));
+		return new SimpleImmutableEntry<>(Double.valueOf(dblPosition), Double.valueOf(dblComponent));
 	}
 
 	public void setComponent(MetricComponent mc, double dbl)

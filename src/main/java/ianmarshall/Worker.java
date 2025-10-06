@@ -21,7 +21,7 @@ import static ianmarshall.MetricComponents.MetricPosition.T;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map.Entry;
+import java.util.AbstractMap.SimpleImmutableEntry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -260,27 +260,17 @@ public class Worker implements Runnable
 		for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
 			for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
 			{
-				Entry<Double, Double> entry = getMetricComponent(madResult, None, nRIndex, nTIndex, T, A);
-				dblT = entry.getKey().doubleValue();
-				entry = getMetricComponent(madResult, None, nRIndex, nTIndex, R, A);
-				dblR= entry.getKey().doubleValue();
-				double dblA1 = entry.getValue().doubleValue();
-
 				setMetricComponent(madResult, None, nRIndex, nTIndex, R, A, dblA);
-
-				entry = getMetricComponent(madResult, None, nRIndex, nTIndex, R, A);
-				double dblA2 = entry.getValue().doubleValue();
-
-				if ((nRIndex == 0) && (nTIndex == 0))
-					s_logger.debug(String.format("At (nRIndex, nTIndex) = (%d, %d)): dblA changed from %, .6f to %, .6f.",
-					 nRIndex, nTIndex, dblA1, dblA2));
-
 				setMetricComponent(madResult, None, nRIndex, nTIndex, R, B, dblB);
 				setMetricComponent(madResult, None, nRIndex, nTIndex, R, C, dblC);
 				setMetricComponent(madResult, None, nRIndex, nTIndex, R, D, dblD);
 
 				if ((nTIndex == 331) && (((nRIndex % 100) == 0) || (nRIndex >= 662)))
+				{
+					dblT = getMetricComponent(madResult, None, nRIndex, nTIndex, T, A).getKey().doubleValue();
+					dblR = getMetricComponent(madResult, None, nRIndex, nTIndex, R, A).getKey().doubleValue();
 					sbLog.append(String.format(sFormat, nTIndex, nRIndex, dblT, dblR, dblA, dblB, dblC, dblD));
+				}
 			}
 
 		s_logger.info(sbLog.toString());
@@ -455,7 +445,8 @@ public class Worker implements Runnable
 					break;
 			}
 
-			Entry<Double, Double> entry = getMetricComponent(madG, dlGetting, nRIndex, nTIndex, mpVarying, mcMetricComponent);
+			SimpleImmutableEntry<Double, Double> entry = getMetricComponent(madG, dlGetting, nRIndex, nTIndex, mpVarying,
+			 mcMetricComponent);
 			adblPos[n] = entry.getKey().doubleValue();
 			adblComponent[n] = entry.getValue().doubleValue();
 			n++;
@@ -513,8 +504,9 @@ public class Worker implements Runnable
 	 *     </li>
 	 *   </ul>
 	 */
-	public static Entry<Double, Double> getMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
-	 int nRIndex, int nTIndex, MetricPosition mpMetricPosition, MetricComponent mcMetricComponent)
+	public static SimpleImmutableEntry<Double, Double> getMetricComponent(MetricAndDerivatives madG,
+	 DerivativeLevel dlDerivativeLevel, int nRIndex, int nTIndex, MetricPosition mpMetricPosition,
+	 MetricComponent mcMetricComponent)
 	{
 		MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
 		return mcMetricComponents.getComponent(mpMetricPosition, mcMetricComponent);
@@ -541,9 +533,8 @@ public class Worker implements Runnable
 	public static void setMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel, int nRIndex,
 	 int nTIndex, MetricPosition mpMetricPosition, MetricComponent mcMetricComponent, double dblValue)
 	{
-		Entry<Double, Double> entry = getMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpMetricPosition,
-		 mcMetricComponent);
-		entry.setValue(Double.valueOf(dblValue));
+		MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
+		mcMetricComponents.setComponent(mcMetricComponent, dblValue);
 	}
 
 	/**
@@ -562,7 +553,7 @@ public class Worker implements Runnable
 	 * @return
 	 *   The <code>MetricComponents</code>.
 	 */
-	private static MetricComponents getMetricComponents(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
+	public static MetricComponents getMetricComponents(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
 	 int nRIndex, int nTIndex)
 	{
 		Metric mMetric = madG.getMetric(dlDerivativeLevel);
@@ -584,7 +575,7 @@ public class Worker implements Runnable
 	public static DoubleMatrix2D calculateRicciTensorValues(MetricAndDerivatives madG, int nRIndex, int nTIndex)
 	{
  // double dblT = getMetricComponent(madG, None, nRIndex, nTIndex, T, A).getKey().doubleValue();
-		Entry<Double, Double> entry = getMetricComponent(madG, None, nRIndex, nTIndex, R, A);
+		SimpleImmutableEntry<Double, Double> entry = getMetricComponent(madG, None, nRIndex, nTIndex, R, A);
 		double dblR = entry.getKey().doubleValue();
 		double dblA = entry.getValue().doubleValue();
 
