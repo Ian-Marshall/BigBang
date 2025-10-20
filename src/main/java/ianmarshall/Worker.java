@@ -43,6 +43,7 @@ public class Worker implements Runnable
 
 	}
 
+	private static final double DBL_LARGE_DIVISION_RESULT = 1.0e12;
 	private static final double c = 3.0e8;    // The speed of light in m/s
 	private static final double c2 = c * c;
 //private static final double DBL_SUCCESS_LOG_PROBABILITY = 0.001;
@@ -251,6 +252,7 @@ public class Worker implements Runnable
 		MetricAndDerivatives madResult = buildMetricAndDerivatives(liRadii, liTimes);
 		int nRadiusElements = madResult.getNRadiusElements();
 		int nTimeElements = madResult.getNTimeElements();
+		int nTimeElementMidPoint = nTimeElements / 2;
 
 		double dblA =  1.0;
 		double dblB =  -1.0;
@@ -265,7 +267,7 @@ public class Worker implements Runnable
 				setMetricComponent(madResult, None, nRIndex, nTIndex, R, C, dblC);
 				setMetricComponent(madResult, None, nRIndex, nTIndex, R, D, dblD);
 
-				if ((nTIndex == 331) && (((nRIndex % 100) == 0) || (nRIndex >= 662)))
+				if ((nTIndex == nTimeElementMidPoint) && (((nRIndex % 100) == 0) || (nRIndex == nRadiusElements - 1)))
 				{
 					dblT = getMetricComponent(madResult, None, nRIndex, nTIndex, T, A).getKey().doubleValue();
 					dblR = getMetricComponent(madResult, None, nRIndex, nTIndex, R, A).getKey().doubleValue();
@@ -452,8 +454,8 @@ public class Worker implements Runnable
 			n++;
 		}
 
-		double dblFirstDifferentialNext = (adblComponent[2] - adblComponent[1]) / (adblPos[2] - adblPos[1]);
-		double dblFirstDifferentialPrev = (adblComponent[1] - adblComponent[0]) / (adblPos[1] - adblPos[0]);
+		double dblFirstDifferentialPrev = safeDivide((adblComponent[1] - adblComponent[0]), (adblPos[1] - adblPos[0]));
+		double dblFirstDifferentialNext = safeDivide((adblComponent[2] - adblComponent[1]), (adblPos[2] - adblPos[1]));
 
 		switch(dlDerivativeLevel)
 		{
@@ -464,7 +466,7 @@ public class Worker implements Runnable
 				break;
 			case SecondRadius:
 			case SecondTime:
-				dblResult = 2.0 * (dblFirstDifferentialNext - dblFirstDifferentialPrev) / (adblComponent[2] - adblComponent[0]);
+				dblResult = 2.0 * safeDivide(dblFirstDifferentialNext - dblFirstDifferentialPrev, adblPos[2] - adblPos[0]);
 				break;
 			default:    // For example: None
 				throw new RuntimeException(String.format("Invalid differentiation request for:"
@@ -558,6 +560,34 @@ public class Worker implements Runnable
 	{
 		Metric mMetric = madG.getMetric(dlDerivativeLevel);
 		return mMetric.getMetricComponents(nRIndex, nTIndex);
+	}
+
+	/**
+	 * Divide two numbers safely without raising an exception or returning NaN or infinity.
+	 * @param dblDividend
+	 *   The number to be divided.
+	 * @param dblDivisor
+	 *   The number to divide by.
+	 * @return
+	 *   If the dividend is zero then (if the divisor is also zero then <code>1.0</code> else <code>0.0</code>)
+	 *   else if the divisor is zero then the signum of the dividend multiplied by <code>DBL_LARGE_DIVISION_RESULT</code>
+	 *   otherwise the result of the division.
+	 */
+	private double safeDivide(double dblDividend, double dblDivisor)
+	{
+		double dblResult;
+
+		if (dblDividend == 0.0)
+			if (dblDivisor == 0.0)
+				dblResult = 1.0;
+			else
+				dblResult = 0.0;
+		else if (dblDivisor == 0.0)
+			dblResult = Math.signum(dblDividend) * DBL_LARGE_DIVISION_RESULT;
+		else
+			dblResult = dblDividend / dblDivisor;
+
+		return dblResult;
 	}
 
 	/**
@@ -720,6 +750,7 @@ public class Worker implements Runnable
 	private void reportFinalTensorValues()
 	{
 		final boolean B_REPORT_FINAL_TENSOR_VALUES_IN_CSV_FORMAT = false;
+		final int N_REPORT_VALUE_SKIP_INTERVAL = 10;
 
 		s_logger.info(String.format(
 		 "The metric components (in the format \"tIndex, rIndex, t, r, A, B, C, D\") after the final run are:"));
@@ -734,28 +765,29 @@ public class Worker implements Runnable
 			   "%n  tIndex  rIndex                   t                   r                   A                   B                   C                   D"
 			 + "%n  ------  ------  ------------------  ------------------  ------------------  ------------------  ------------------  ------------------";
 
-		StringBuilder sbLog = new StringBuilder(String.format(sFormatHeader));
-
 		String sFormat;
 		if (B_REPORT_FINAL_TENSOR_VALUES_IN_CSV_FORMAT)
 			sFormat = "%n  %6d, %6d, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f, %,18.12f";
 		else
 			sFormat = "%n  %6d  %6d  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f  %,18.12f";
 
+		StringBuilder sbLog = new StringBuilder(String.format(sFormatHeader));
 		int nTimeElements   = m_madG.getNTimeElements();
 		int nRadiusElements = m_madG.getNRadiusElements();
 
 		for (int t = 0; t < nTimeElements; t++)
-			for (int r = 0; r < nRadiusElements; r++)
-			{
-				double dblT = getMetricComponent(m_madG, None, r, t, T, A).getKey().doubleValue();
-				double dblR = getMetricComponent(m_madG, None, r, t, R, A).getKey().doubleValue();
-				double dblA = getMetricComponent(m_madG, None, r, t, R, A).getValue().doubleValue();
-				double dblB = getMetricComponent(m_madG, None, r, t, R, B).getValue().doubleValue();
-				double dblC = getMetricComponent(m_madG, None, r, t, R, C).getValue().doubleValue();
-				double dblD = getMetricComponent(m_madG, None, r, t, R, D).getValue().doubleValue();
-				sbLog.append(String.format(sFormat, t, r, dblT, dblR, dblA, dblB, dblC, dblD));
-			}
+			if ((t % N_REPORT_VALUE_SKIP_INTERVAL == 0) || (t == nTimeElements - 1))
+				for (int r = 0; r < nRadiusElements; r++)
+					if ((r % N_REPORT_VALUE_SKIP_INTERVAL == 0) || (r == nRadiusElements - 1))
+					{
+						double dblT = getMetricComponent(m_madG, None, r, t, T, A).getKey().doubleValue();
+						double dblR = getMetricComponent(m_madG, None, r, t, R, A).getKey().doubleValue();
+						double dblA = getMetricComponent(m_madG, None, r, t, R, A).getValue().doubleValue();
+						double dblB = getMetricComponent(m_madG, None, r, t, R, B).getValue().doubleValue();
+						double dblC = getMetricComponent(m_madG, None, r, t, R, C).getValue().doubleValue();
+						double dblD = getMetricComponent(m_madG, None, r, t, R, D).getValue().doubleValue();
+						sbLog.append(String.format(sFormat, t, r, dblT, dblR, dblA, dblB, dblC, dblD));
+					}
 
 		s_logger.info(sbLog.toString());
 	}
