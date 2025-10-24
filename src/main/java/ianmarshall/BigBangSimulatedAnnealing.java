@@ -86,6 +86,20 @@ public class BigBangSimulatedAnnealing
 			 StartParameters.S_ARG_NAME_TEMPERATURE_SCALING_FACTOR,          sTemperatureScalingFactor,
 			 StartParameters.S_ARG_NAME_TEMPERATURE_DIVISOR,                 sTemperatureDivisor));
 
+			final int N_DELAY_BEFORE_START_S = 30;
+			logger.info(String.format("Waiting %ds before starting processing...", N_DELAY_BEFORE_START_S));
+
+			try
+			{
+				Thread.sleep(N_DELAY_BEFORE_START_S * 1000);
+			}
+			catch (InterruptedException e)
+			{
+				// Do nothing
+			}
+
+			logger.info(String.format("Finished waiting %ds.", N_DELAY_BEFORE_START_S));
+
 			Supervisor supervisor = new Supervisor(spStartParams);
 			WorkerResult wrResult = supervisor.execute();
 			boolean bProcessingCompleted = wrResult.getProcessingCompleted();
