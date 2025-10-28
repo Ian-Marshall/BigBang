@@ -1,8 +1,6 @@
 package ianmarshall;
 
-import java.util.ArrayList;
 import java.util.EnumMap;
-import java.util.List;
 
 import static ianmarshall.MetricAndDerivatives.DerivativeLevel.None;
 
@@ -33,40 +31,40 @@ public class MetricAndDerivatives
 	/**
 	 * Build an initialised metric and its derivatives from the supplied radius and time values.
 	 * "Initialised" here means that the metric tensor components are set to zero.
-	 * @param liRadii
-	 *   The list of radius values to be used for the metric tensor components.
-	 * @param liTimes
-	 *   The list of time values to be used for the metric tensor components.
+	 * @param adblRadii
+	 *   The array of radius values to be used for the metric tensor components.
+	 * @param adblTimes
+	 *   The array of time values to be used for the metric tensor components.
 	 * @return
 	 *   A <code>MetricAndDerivatives</code> object holding the initialised metric and its derivatives.
 	 */
-	public MetricAndDerivatives(List<Double> liRadii, List<Double> liTimes)
+	public MetricAndDerivatives(Double[] adblRadii, Double[] adblTimes)
 	{
-		this(liRadii, liTimes, true);
+		this(adblRadii, adblTimes, true);
 	}
 
 	/**
 	 * Build a metric and its derivatives from the supplied radius and time values.
 	 * If specified then initialise the metrics and its derivatives.
 	 * "Initialised" here means that the metric tensor components are set to zero.
-	 * @param liRadii
-	 *   The list of radius values to be used for the metric tensor components.
-	 * @param liTimes
-	 *   The list of time values to be used for the metric tensor components.
+	 * @param adblRadii
+	 *   The array of radius values to be used for the metric tensor components.
+	 * @param adblTimes
+	 *   The array of time values to be used for the metric tensor components.
 	 * @param bInitialise
 	 *   If <code>true</code> then initialise the <code>Metric</code> tensor components.
 	 * @return
 	 *   A <code>MetricAndDerivatives</code> object holding the initialised metric and its derivatives.
 	 */
-	private MetricAndDerivatives(List<Double> liRadii, List<Double> liTimes, boolean bInitialise)
+	private MetricAndDerivatives(Double[] adblRadii, Double[] adblTimes, boolean bInitialise)
 	{
-		m_nRadiusElements = liRadii.size();
-		m_nTimeElements = liTimes.size();
+		m_nRadiusElements = adblRadii.length;
+		m_nTimeElements = adblTimes.length;
 		m_mapMetricByDerivativeLevel = new EnumMap<>(DerivativeLevel.class);
 
 		if (bInitialise)
 		{
-			Metric metricNonDerivative = new Metric(liRadii, liTimes);
+			Metric metricNonDerivative = new Metric(adblRadii, adblTimes);
 			m_mapMetricByDerivativeLevel.put(None, metricNonDerivative);
 
 			for (DerivativeLevel level: DerivativeLevel.values())
@@ -100,24 +98,24 @@ public class MetricAndDerivatives
 
 	public MetricAndDerivatives copy()
 	{
-		List<Double> liRadii = new ArrayList<>(m_nRadiusElements);
-		List<Double> liTimes = new ArrayList<>(m_nTimeElements);
+		Double[] adblRadii = new Double[m_nRadiusElements];
+		Double[] adblTimes = new Double[m_nTimeElements];
 		Metric metric = getMetric(None);
 
 		for (int r = 0; r < m_nRadiusElements; r++)
 		{
 			MetricComponents mc = metric.getMetricComponents(r, 0);
-			liRadii.add(Double.valueOf(mc.getR()));
+			adblRadii[r] = Double.valueOf(mc.getR());
 		}
 
 		for (int t = 0; t < m_nTimeElements; t++)
 		{
 			MetricComponents mc = metric.getMetricComponents(0, t);
-			liTimes.add(Double.valueOf(mc.getT()));
+			adblTimes[t] = Double.valueOf(mc.getT());
 		}
 
 		// We do not initialise the copy since we shall use our own <code>Metric</code> objects instead
-		MetricAndDerivatives madCopy = new MetricAndDerivatives(liRadii, liTimes, false);
+		MetricAndDerivatives madCopy = new MetricAndDerivatives(adblRadii, adblTimes, false);
 
 		for (DerivativeLevel level: DerivativeLevel.values())
 		{

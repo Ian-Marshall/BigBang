@@ -249,7 +249,9 @@ public class Worker implements Runnable
 			dblT += DBL_STEP_TIME;
 		}
 
-		MetricAndDerivatives madResult = buildMetricAndDerivatives(liRadii, liTimes);
+		Double[] adblRadii = liRadii.toArray(new Double[0]);
+		Double[] adblTimes = liTimes.toArray(new Double[0]);
+		MetricAndDerivatives madResult = buildMetricAndDerivatives(adblRadii, adblTimes);
 		int nRadiusElements = madResult.getNRadiusElements();
 		int nTimeElements = madResult.getNTimeElements();
 		int nTimeElementMidPoint = nTimeElements / 2;
@@ -262,10 +264,10 @@ public class Worker implements Runnable
 		for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
 			for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
 			{
-				setMetricComponent(madResult, None, nRIndex, nTIndex, R, A, dblA);
-				setMetricComponent(madResult, None, nRIndex, nTIndex, R, B, dblB);
-				setMetricComponent(madResult, None, nRIndex, nTIndex, R, C, dblC);
-				setMetricComponent(madResult, None, nRIndex, nTIndex, R, D, dblD);
+				setMetricComponent(madResult, None, nRIndex, nTIndex, A, dblA);
+				setMetricComponent(madResult, None, nRIndex, nTIndex, B, dblB);
+				setMetricComponent(madResult, None, nRIndex, nTIndex, C, dblC);
+				setMetricComponent(madResult, None, nRIndex, nTIndex, D, dblD);
 
 				if ((nTIndex == nTimeElementMidPoint) && (((nRIndex % 100) == 0) || (nRIndex == nRadiusElements - 1)))
 				{
@@ -282,16 +284,16 @@ public class Worker implements Runnable
 
 	/**
 	 * Build an initialised metric and its derivatives from the supplied radius and time values.
-	 * @param liRadii
-	 *   The list of radius values to be used for the metric tensor components.
-	 * @param liTimes
-	 *   The list of time values to be used for the metric tensor components.
+	 * @param adblRadii
+	 *   The array of radius values to be used for the metric tensor components.
+	 * @param adblTimes
+	 *   The array of time values to be used for the metric tensor components.
 	 * @return
 	 *   A <code>MetricAndDerivatives</code> object holding the initialised metric and its derivatives.
 	 */
-	private MetricAndDerivatives buildMetricAndDerivatives(List<Double> liRadii, List<Double> liTimes)
+	private MetricAndDerivatives buildMetricAndDerivatives(Double[] adblRadii, Double[] adblTimes)
 	{
-		MetricAndDerivatives madResult = new MetricAndDerivatives(liRadii, liTimes);
+		MetricAndDerivatives madResult = new MetricAndDerivatives(adblRadii, adblTimes);
 		return madResult;
 	}
 
@@ -321,8 +323,9 @@ public class Worker implements Runnable
 						break;
 					case FirstTime:
 					case SecondTime:
+
+					// It does not matter whether we use R or T in this case, but we must be consistent with the code lower down
 					case FirstRadiusFirstTime:
-						// It does not matter whether we use R or T here, but we must be consistent with the code lower down
 						mpVarying = T;
 						break;
 					default:
@@ -361,7 +364,7 @@ public class Worker implements Runnable
 	{
 		double dblValue = differentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
 		 mcMetricComponent);
-		setMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying, mcMetricComponent, dblValue);
+		setMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mcMetricComponent, dblValue);
 	}
 
 	/**
@@ -403,8 +406,8 @@ public class Worker implements Runnable
 				throw new RuntimeException(String.format("Invalid derivative level \"%s\".", dlDerivativeLevel.toString()));
 		}
 
-		int nVaryingIndex = -1;
-		int nVaryingMaxIndex = -1;
+		int nVaryingIndex;
+		int nVaryingMaxIndex;
 		switch (mpVarying)
 		{
 			case R:
@@ -415,6 +418,8 @@ public class Worker implements Runnable
 				nVaryingIndex = nTIndex;
 				nVaryingMaxIndex = madG.getNTimeElements() - 1;
 				break;
+			default:
+				throw new RuntimeException(String.format("Invalid metric position \"%s\".", mpVarying.toString()));
 		}
 
 		// The middle elements (index 1) are those of the point, the derivatives of which are to be calculated.
@@ -525,15 +530,13 @@ public class Worker implements Runnable
 	 *   The zero-based index value of the radius of the metric component to be set.
 	 * @param nTIndex
 	 *   The zero-based index value of the time of the metric component to be set.
-	 * @param mpMetricPosition
-	 *   The metric position of the value to be set.
 	 * @param mcMetricComponent
 	 *   The metric component of the value to be set.
 	 * @param dblValue
 	 *   The value to be set.
 	 */
-	public static void setMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel, int nRIndex,
-	 int nTIndex, MetricPosition mpMetricPosition, MetricComponent mcMetricComponent, double dblValue)
+	private static void setMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel, int nRIndex,
+	 int nTIndex, MetricComponent mcMetricComponent, double dblValue)
 	{
 		MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
 		mcMetricComponents.setComponent(mcMetricComponent, dblValue);
