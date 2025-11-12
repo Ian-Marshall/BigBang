@@ -7,8 +7,9 @@ import static ianmarshall.MetricAndDerivatives.DerivativeLevel.None;
 public class MetricAndDerivatives
 {
 	/**
-	 * The ordering of these elements matters. Pure first derivatives must be placed before pure second derivatives
-	 * because the pure first derivatives are calculated before the pure second derivatives.
+	 * The ordering of these elements matters.
+	 * The <code>FirstRadiusFirstTime</code> derivative must be placed after the relevant pure first derivative.
+	 * (See the code to find out this relevant pure first derivative.)
 	 */
 	public enum DerivativeLevel
 	{

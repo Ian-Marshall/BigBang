@@ -21,6 +21,8 @@ import static ianmarshall.MetricComponents.MetricPosition.T;
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntConsumer;
+import java.util.stream.IntStream;
 import java.util.AbstractMap.SimpleImmutableEntry;
 
 import org.slf4j.Logger;
@@ -315,7 +317,7 @@ public class Worker implements Runnable
 			if (dlDerivativeLevel != None)
 			{
 				MetricPosition mpVarying;
-				switch(dlDerivativeLevel)
+				switch (dlDerivativeLevel)
 				{
 					case FirstRadius:
 					case SecondRadius:
@@ -332,11 +334,25 @@ public class Worker implements Runnable
 						throw new RuntimeException(String.format("Invalid derivative level \"%s\".", dlDerivativeLevel.toString()));
 				}
 
+				/*
 				for (MetricComponent mcMetricComponent: MetricComponent.values())
 					for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
 						for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
 							calculateDifferentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
 							 mcMetricComponent);
+				*/
+
+				for (MetricComponent mcMetricComponent: MetricComponent.values())
+					IntStream.range(0, nRadiusElements).parallel().forEach(new IntConsumer()
+					{
+						@Override
+						public void accept(int nRIndex)
+						{
+							for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
+								calculateDifferentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
+								 mcMetricComponent);
+						}
+					});
 			}
 	}
 
@@ -459,19 +475,19 @@ public class Worker implements Runnable
 			n++;
 		}
 
-		double dblFirstDifferentialPrev = safeDivide((adblComponent[1] - adblComponent[0]), (adblPos[1] - adblPos[0]));
-		double dblFirstDifferentialNext = safeDivide((adblComponent[2] - adblComponent[1]), (adblPos[2] - adblPos[1]));
+		double dblDifferentialPrev = safeDivide((adblComponent[1] - adblComponent[0]), (adblPos[1] - adblPos[0]));
+		double dblDifferentialNext = safeDivide((adblComponent[2] - adblComponent[1]), (adblPos[2] - adblPos[1]));
 
 		switch(dlDerivativeLevel)
 		{
 			case FirstRadius:
 			case FirstTime:
 			case FirstRadiusFirstTime:
-				dblResult = 0.5 * (dblFirstDifferentialNext + dblFirstDifferentialPrev);
+				dblResult = 0.5 * (dblDifferentialNext + dblDifferentialPrev);
 				break;
 			case SecondRadius:
 			case SecondTime:
-				dblResult = 2.0 * safeDivide(dblFirstDifferentialNext - dblFirstDifferentialPrev, adblPos[2] - adblPos[0]);
+				dblResult = 2.0 * safeDivide(dblDifferentialNext - dblDifferentialPrev, adblPos[2] - adblPos[0]);
 				break;
 			default:    // For example: None
 				throw new RuntimeException(String.format("Invalid differentiation request for:"
@@ -515,9 +531,59 @@ public class Worker implements Runnable
 	 DerivativeLevel dlDerivativeLevel, int nRIndex, int nTIndex, MetricPosition mpMetricPosition,
 	 MetricComponent mcMetricComponent)
 	{
+ // return getMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpMetricPosition,
+ //  mcMetricComponent, false);
 		MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
 		return mcMetricComponents.getComponent(mpMetricPosition, mcMetricComponent);
 	}
+
+	/*
+	 * Get the value of the specified component of the specified level of differential of the specified indices
+	 * at the specified metric position from the <code>MetricAndDerivatives</code> supplied.
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
+	 * @param dlDerivativeLevel
+	 *   The derivative level to be found.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the metric component to be found.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the metric component to be found.
+	 * @param mpMetricPosition
+	 *   The metric position to be found.
+	 * @param mcMetricComponent
+	 *   The metric component to be found.
+	 * @param bLock
+	 *   Whether or not to lock the processing in this method in order to synchronise it.
+	 * @return
+	 *   An <code>Entry</code> with:
+	 *   <ul>
+	 *     <li>key: the value of the specified metric position</li>
+	 *     <li>value: the value of the specified component of the specified level of differential of the specified index.
+	 *     </li>
+	 *   </ul>
+	 */
+	/*
+	private static SimpleImmutableEntry<Double, Double> getMetricComponent(MetricAndDerivatives madG,
+	 DerivativeLevel dlDerivativeLevel, int nRIndex, int nTIndex, MetricPosition mpMetricPosition,
+	 MetricComponent mcMetricComponent, boolean bLock)
+	{
+		SimpleImmutableEntry<Double, Double> entryResult;
+
+		if (bLock)
+			synchronized (madG)
+			{
+				MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
+				entryResult = mcMetricComponents.getComponent(mpMetricPosition, mcMetricComponent);
+			}
+		else
+		{
+			MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
+			entryResult = mcMetricComponents.getComponent(mpMetricPosition, mcMetricComponent);
+		}
+
+		return entryResult;
+	}
+	*/
 
 	/**
 	 * Set the value of the specified component of the specified level of differential of the specified indices
@@ -538,9 +604,46 @@ public class Worker implements Runnable
 	private static void setMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel, int nRIndex,
 	 int nTIndex, MetricComponent mcMetricComponent, double dblValue)
 	{
+ // setMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mcMetricComponent, dblValue, false);
 		MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
 		mcMetricComponents.setComponent(mcMetricComponent, dblValue);
 	}
+
+	/*
+	 * Set the value of the specified component of the specified level of differential of the specified indices
+	 * at the specified metric position in the <code>MetricAndDerivatives</code> supplied.
+	 * @param madG
+	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
+	 * @param dlDerivativeLevel
+	 *   The derivative level of the value to be set.
+	 * @param nRIndex
+	 *   The zero-based index value of the radius of the metric component to be set.
+	 * @param nTIndex
+	 *   The zero-based index value of the time of the metric component to be set.
+	 * @param mcMetricComponent
+	 *   The metric component of the value to be set.
+	 * @param dblValue
+	 *   The value to be set.
+	 * @param bLock
+	 *   Whether or not to lock the processing in this method in order to synchronise it.
+	 */
+	/*
+	private static void setMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel, int nRIndex,
+	 int nTIndex, MetricComponent mcMetricComponent, double dblValue, boolean bLock)
+	{
+		if (bLock)
+			synchronized (madG)
+			{
+				MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
+				mcMetricComponents.setComponent(mcMetricComponent, dblValue);
+			}
+		else
+		{
+			MetricComponents mcMetricComponents = getMetricComponents(madG, dlDerivativeLevel, nRIndex, nTIndex);
+			mcMetricComponents.setComponent(mcMetricComponent, dblValue);
+		}
+	}
+	*/
 
 	/**
 	 * Obtain the <code>MetricComponents</code> for the given parameters.
