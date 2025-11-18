@@ -1,32 +1,33 @@
 package ianmarshall;
 
-import cern.colt.matrix.DoubleFactory2D;
-import cern.colt.matrix.DoubleMatrix2D;
-import ianmarshall.MetricAndDerivatives.DerivativeLevel;
-import static ianmarshall.MetricAndDerivatives.DerivativeLevel.None;
 import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstRadius;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstRadiusFirstTime;
 import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstTime;
+import static ianmarshall.MetricAndDerivatives.DerivativeLevel.None;
 import static ianmarshall.MetricAndDerivatives.DerivativeLevel.SecondRadius;
 import static ianmarshall.MetricAndDerivatives.DerivativeLevel.SecondTime;
-import static ianmarshall.MetricAndDerivatives.DerivativeLevel.FirstRadiusFirstTime;
-import ianmarshall.MetricComponents.MetricComponent;
 import static ianmarshall.MetricComponents.MetricComponent.A;
 import static ianmarshall.MetricComponents.MetricComponent.B;
 import static ianmarshall.MetricComponents.MetricComponent.C;
 import static ianmarshall.MetricComponents.MetricComponent.D;
-import ianmarshall.MetricComponents.MetricPosition;
 import static ianmarshall.MetricComponents.MetricPosition.R;
 import static ianmarshall.MetricComponents.MetricPosition.T;
 
 import java.lang.Thread.UncaughtExceptionHandler;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
 import java.util.stream.IntStream;
-import java.util.AbstractMap.SimpleImmutableEntry;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import cern.colt.matrix.DoubleFactory2D;
+import cern.colt.matrix.DoubleMatrix2D;
+import ianmarshall.MetricAndDerivatives.DerivativeLevel;
+import ianmarshall.MetricComponents.MetricComponent;
+import ianmarshall.MetricComponents.MetricPosition;
 
 public class Worker implements Runnable
 {
@@ -310,6 +311,7 @@ public class Worker implements Runnable
 	 */
 	private void calculateAllDifferentialsForAllValues(MetricAndDerivatives madG)
 	{
+		final MetricComponent[] amcMetricComponents = MetricComponent.values();
 		int nRadiusElements = madG.getNRadiusElements();
 		int nTimeElements   = madG.getNTimeElements();
 
@@ -334,15 +336,9 @@ public class Worker implements Runnable
 						throw new RuntimeException(String.format("Invalid derivative level \"%s\".", dlDerivativeLevel.toString()));
 				}
 
-				/*
-				for (MetricComponent mcMetricComponent: MetricComponent.values())
-					for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
-						for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
-							calculateDifferentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
-							 mcMetricComponent);
-				*/
+				DerivativeLevel dlGetting = gettingDerivativeLevel(dlDerivativeLevel, mpVarying);
 
-				for (MetricComponent mcMetricComponent: MetricComponent.values())
+				for (MetricComponent mcMetricComponent: amcMetricComponents)
 					IntStream.range(0, nRadiusElements).parallel().forEach(new IntConsumer()
 					{
 						@Override
@@ -350,7 +346,7 @@ public class Worker implements Runnable
 						{
 							for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
 								calculateDifferentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
-								 mcMetricComponent);
+								 mcMetricComponent, dlGetting);
 						}
 					});
 			}
@@ -374,12 +370,14 @@ public class Worker implements Runnable
 	 *   The metric position, the varying of the value at which is to be calculated.
 	 * @param mcMetricComponent
 	 *   The metric component, the differential of which is to be calculated.
+	 * @param dlGetting
+	 * 	The <code>DerivativeLevel</code> to be used to get the metric components for calculating the differential.
 	 */
 	private void calculateDifferentialOfMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
-	 int nRIndex, int nTIndex, MetricPosition mpVarying, MetricComponent mcMetricComponent)
+	 int nRIndex, int nTIndex, MetricPosition mpVarying, MetricComponent mcMetricComponent, DerivativeLevel dlGetting)
 	{
 		double dblValue = differentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
-		 mcMetricComponent);
+		 mcMetricComponent, dlGetting);
 		setMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mcMetricComponent, dblValue);
 	}
 
@@ -388,39 +386,24 @@ public class Worker implements Runnable
 	 * @param madG
 	 *   The metric tensor components and its derivatives, in order of ascending adjacent radius and time values.
 	 * @param dlDerivativeLevel
-	 *   The derivative level to be calculated.
+	 *   The <code>DerivativeLevel</code> to be calculated.
 	 * @param nRIndex
 	 *   The zero-based index value of the radius of the metric component, the differential of which is to be calculated.
 	 * @param nTIndex
 	 *   The zero-based index value of the time of the metric component, the differential of which is to be calculated.
 	 * @param mpVarying
-	 *   The metric position, the varying of the value at which is to be calculated.
+	 *   The <code>MetricPosition</code>, the varying of the value at which is to be calculated.
 	 * @param mcMetricComponent
-	 *   The metric component, the differential of which is to be calculated.
+	 *   The <code>MetricComponent</code>, the differential of which is to be calculated.
+	 * @param dlGetting
+	 * 	The <code>DerivativeLevel</code> to be used to get the metric components for calculating the differential.
 	 * @return
 	 *   The specified level of differential of the specified metric component.
 	 */
 	private double differentialOfMetricComponent(MetricAndDerivatives madG, DerivativeLevel dlDerivativeLevel,
-	 int nRIndex, int nTIndex, MetricPosition mpVarying, MetricComponent mcMetricComponent)
+	 int nRIndex, int nTIndex, MetricPosition mpVarying, MetricComponent mcMetricComponent, DerivativeLevel dlGetting)
 	{
 		double dblResult = 0.0;
-
-		DerivativeLevel dlGetting;
-		switch(dlDerivativeLevel)
-		{
-			case FirstRadius:
-			case SecondRadius:
-			case FirstTime:
-			case SecondTime:
-				dlGetting = None;
-				break;
-			case FirstRadiusFirstTime:
-				// We must be consistent with whether we vary R or T in this case. The statement below does this automatically.
-				dlGetting = mpVarying == T ? FirstRadius : FirstTime;
-				break;
-			default:
-				throw new RuntimeException(String.format("Invalid derivative level \"%s\".", dlDerivativeLevel.toString()));
-		}
 
 		int nVaryingIndex;
 		int nVaryingMaxIndex;
@@ -438,11 +421,15 @@ public class Worker implements Runnable
 				throw new RuntimeException(String.format("Invalid metric position \"%s\".", mpVarying.toString()));
 		}
 
-		// The middle elements (index 1) are those of the point, the derivatives of which are to be calculated.
-		// This may be different from the index supplied if it is the first or last point.
+		// The middle elements ("index" 1) are those of the point, the derivatives of which are to be calculated.
+		// This may be different from the "index" supplied if it is the first or last point.
 		// In these cases, we shall use forward and backward differences, respectively, instead.
-		double[] adblPos = new double[3];
-		double[] adblComponent = new double[3];
+		double dblPos0 = 0.0;
+		double dblPos1 = 0.0;
+		double dblPos2 = 0.0;
+		double dblComponent0 = 0.0;
+		double dblComponent1 = 0.0;
+		double dblComponent2 = 0.0;
 
 		final int nVaryingStart;
 		if (nVaryingIndex == 0)
@@ -453,9 +440,8 @@ public class Worker implements Runnable
 			nVaryingStart = nVaryingIndex - 2;    // Backward difference for the last point
 
 		final int nVaryingFinish = nVaryingStart + 2;
-		int n = 0;    // The array index
+		int n = 0;
 
-		// Load the arrays
 		for (int i = nVaryingStart; i <= nVaryingFinish; i++)
 		{
 			switch (mpVarying)
@@ -466,19 +452,36 @@ public class Worker implements Runnable
 				case T:
 					nTIndex = i;
 					break;
+				default:
+					throw new RuntimeException(String.format("Invalid metric position \"%s\".", mpVarying.toString()));
 			}
 
 			SimpleImmutableEntry<Double, Double> entry = getMetricComponent(madG, dlGetting, nRIndex, nTIndex, mpVarying,
 			 mcMetricComponent);
-			adblPos[n] = entry.getKey().doubleValue();
-			adblComponent[n] = entry.getValue().doubleValue();
+
+			switch (n)
+			{
+				case 0:
+					dblPos0       = entry.getKey().doubleValue();
+					dblComponent0 = entry.getValue().doubleValue();
+					break;
+				case 1:
+					dblPos1       = entry.getKey().doubleValue();
+					dblComponent1 = entry.getValue().doubleValue();
+					break;
+				case 2:
+					dblPos2       = entry.getKey().doubleValue();
+					dblComponent2 = entry.getValue().doubleValue();
+					break;
+			}
+
 			n++;
 		}
 
-		double dblDifferentialPrev = safeDivide((adblComponent[1] - adblComponent[0]), (adblPos[1] - adblPos[0]));
-		double dblDifferentialNext = safeDivide((adblComponent[2] - adblComponent[1]), (adblPos[2] - adblPos[1]));
+		double dblDifferentialPrev = safeDivide((dblComponent1 - dblComponent0), (dblPos1 - dblPos0));
+		double dblDifferentialNext = safeDivide((dblComponent2 - dblComponent1), (dblPos2 - dblPos1));
 
-		switch(dlDerivativeLevel)
+		switch (dlDerivativeLevel)
 		{
 			case FirstRadius:
 			case FirstTime:
@@ -487,7 +490,7 @@ public class Worker implements Runnable
 				break;
 			case SecondRadius:
 			case SecondTime:
-				dblResult = 2.0 * safeDivide(dblDifferentialNext - dblDifferentialPrev, adblPos[2] - adblPos[0]);
+				dblResult = 2.0 * safeDivide(dblDifferentialNext - dblDifferentialPrev, dblPos2 - dblPos0);
 				break;
 			default:    // For example: None
 				throw new RuntimeException(String.format("Invalid differentiation request for:"
@@ -496,9 +499,15 @@ public class Worker implements Runnable
 				 + "%n  nTIndex           = %d,"
 				 + "%n  mpVarying         = %s,"
 				 + "%n  mcMetricComponent = %s,"
-				 + "%n  dlGetting         = %s.",
+				 + "%n  dlGetting         = %s,"
+				 + "%n  dblPos0           = %f,"
+				 + "%n  dblPos1           = %f,"
+				 + "%n  dblPos2           = %f,"
+				 + "%n  dblComponent0     = %f,"
+				 + "%n  dblComponent1     = %f,"
+				 + "%n  dblComponent2     = %f.",
 				 dlDerivativeLevel.toString(), nRIndex, nTIndex, mpVarying.toString(), mcMetricComponent.toString(),
-				 dlGetting.toString()));
+				 dlGetting.toString(), dblPos0, dblPos1, dblPos2, dblComponent0, dblComponent1, dblComponent2));
 		}
 
 		return dblResult;
@@ -666,6 +675,39 @@ public class Worker implements Runnable
 	{
 		Metric mMetric = madG.getMetric(dlDerivativeLevel);
 		return mMetric.getMetricComponents(nRIndex, nTIndex);
+	}
+
+	/**
+	 * Determine the <code>DerivativeLevel</code> to be used to get the metric components
+	 * for calculating the specified <code>DerivativeLevel</code>.
+	 * @param dlDerivativeLevel
+	 *   The <code>DerivativeLevel</code> to be calculated.
+	 * @param mpVarying
+	 *   The <code>MetricPosition</code>, the varying of the value at which is to be calculated.
+	 * @return
+	 *   The <code>DerivativeLevel</code> to be used.
+	 */
+	private DerivativeLevel gettingDerivativeLevel(DerivativeLevel dlDerivativeLevel, MetricPosition mpVarying)
+	{
+		DerivativeLevel dlResult;
+
+		switch (dlDerivativeLevel)
+		{
+			case FirstRadius:
+			case SecondRadius:
+			case FirstTime:
+			case SecondTime:
+				dlResult = None;
+				break;
+			case FirstRadiusFirstTime:
+				// We must be consistent with whether we vary R or T in this case. The statement below does this automatically.
+				dlResult = mpVarying == T ? FirstRadius : FirstTime;
+				break;
+			default:
+				throw new RuntimeException(String.format("Invalid derivative level \"%s\".", dlDerivativeLevel.toString()));
+		}
+
+		return dlResult;
 	}
 
 	/**
