@@ -11,7 +11,9 @@ import static ianmarshall.MetricComponents.MetricPosition.R;
 import static ianmarshall.MetricComponents.MetricPosition.T;
 
 import java.util.AbstractMap.SimpleImmutableEntry;
+import java.util.stream.IntStream;
 import java.util.Random;
+import java.util.function.IntToDoubleFunction;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,91 +58,129 @@ public class SimulatedAnnealing
 	 * @param nRun
 	 *   The number of runs already executed. A value of <code>0</code> means that no run has yet been executed.
 	 * @return
-	 *   The energy of the state space.
+	 *   The simulated annealing energy of the entire space-time.
 	 */
 	public double energy(MetricAndDerivatives madG, int nRun)
 	{
-		double dblSumOfSquaresOfRicciTensorsOverAllRAndT = 0.0;
 		int nRadiusElements = madG.getNRadiusElements();
 		int nTimeElements   = madG.getNTimeElements();
 
-		for (int nRIndex = 0; nRIndex < nRadiusElements; nRIndex++)
-		{
-			final int nRIndexStart;
-			final int nRIndexFinish;
-			if (nRIndex == 0)
+		double dblSumOfSquaresOfRicciTensorsOverAllRAndT = IntStream.range(0, nRadiusElements).parallel().mapToDouble(
+		 new IntToDoubleFunction()
 			{
-				nRIndexStart = nRIndex;        // Forward difference for the first point
-				nRIndexFinish = nRIndexStart + 1;
+					@Override
+					public double applyAsDouble(int nRIndex)
+					{
+						return calculateContributionForRadius(madG, nRun, nRadiusElements, nTimeElements, nRIndex);
+					}
 			}
-			else if (nRIndex < nRadiusElements - 1)
+		 ).sum();
+
+		return dblSumOfSquaresOfRicciTensorsOverAllRAndT;
+	}
+
+	/**
+	 * Calculate the energy of the state space, which is represented by the supplied metric tensor components
+	 * and their derivatives.
+	 * @param madG
+	 *   The metric tensor components and their derivatives.
+	 * @param nRun
+	 *   The number of runs already executed. A value of <code>0</code> means that no run has yet been executed.
+	 * @param nRadiusElements
+	 *   The number of radius elements.
+	 * @param nTimeElements
+	 *   The number of time elements.
+	 * @param nRIndex
+	 *   The radius index to process.
+	 * @return
+	 *   The contribution to the simulated annealing energy of the space-time over all time and the given radius index.
+	 */
+	private double calculateContributionForRadius(MetricAndDerivatives madG, int nRun, int nRadiusElements,
+	 int nTimeElements, int nRIndex)
+	{
+		double dblSumOfSquaresOfRicciTensorsOverAllT = 0.0;
+
+		final int nRIndexStart;
+		final int nRIndexFinish;
+		if (nRIndex == 0)
+		{
+			nRIndexStart = nRIndex;        // Forward difference for the first point
+			nRIndexFinish = nRIndexStart + 1;
+		}
+		else if (nRIndex < nRadiusElements - 1)
+		{
+			nRIndexStart = nRIndex - 1;    // Central difference for an internal point
+			nRIndexFinish = nRIndexStart + 2;
+		}
+		else
+		{
+			nRIndexStart = nRIndex - 1;    // Backward difference for the last point
+			nRIndexFinish = nRIndexStart + 1;
+		}
+
+		for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
+		{
+			DoubleMatrix2D dmRicci = Worker.calculateRicciTensorValues(madG, nRIndex, nTIndex);    // 4 rows by 1 column
+
+	 // boolean bLog = (nRun <= 3) && ((i == 0) || (i == 3));
+			boolean bLog = false;
+
+			if (bLog)
 			{
-				nRIndexStart = nRIndex - 1;    // Central difference for an internal point
-				nRIndexFinish = nRIndexStart + 2;
+				String sMsg = String.format("%n  nRun = %d, nRIndex = %d, nTIndex = %d: dmRicci has elements:%n%s .%n",
+				nRun, nRIndex, nTIndex, dmRicci.toString());
+				m_logger.info(sMsg);
+			}
+
+			double dblSumOfSquaresOfRicciTensors = 0.0;
+
+			for (int j = 0; j < dmRicci.rows(); j++)
+			{
+				double dblRicciTensor = dmRicci.get(j, 0);
+				dblSumOfSquaresOfRicciTensors += dblRicciTensor * dblRicciTensor;
+			}
+
+			final int nTIndexStart;
+			final int nTIndexFinish;
+			if (nTIndex == 0)
+			{
+				nTIndexStart = nTIndex;        // Forward difference for the first point
+				nTIndexFinish = nTIndexStart + 1;
+			}
+			else if (nTIndex < nTimeElements - 1)
+			{
+				nTIndexStart = nTIndex - 1;    // Central difference for an internal point
+				nTIndexFinish = nTIndexStart + 2;
 			}
 			else
 			{
-				nRIndexStart = nRIndex - 1;    // Backward difference for the last point
-				nRIndexFinish = nRIndexStart + 1;
+				nTIndexStart = nTIndex - 1;    // Backward difference for the last point
+				nTIndexFinish = nTIndexStart + 1;
 			}
 
-			for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
-			{
-				DoubleMatrix2D dmRicci = Worker.calculateRicciTensorValues(madG, nRIndex, nTIndex);    // 4 rows by 1 column
+			double dblRStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   R, A).getKey()
+			 .doubleValue();
+			double dblTStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   T, A).getKey()
+			 .doubleValue();
+			double dblRFinish = Worker.getMetricComponent(madG, None, nRIndexFinish, nTIndexFinish, R, A).getKey()
+			 .doubleValue();
+			double dblTFinish = Worker.getMetricComponent(madG, None, nRIndexFinish, nTIndexFinish, T, A).getKey()
+			 .doubleValue();
 
-		 // boolean bLog = (nRun <= 3) && ((i == 0) || (i == 3));
-				boolean bLog = false;
+			double dblDivisorFactor;
+			if (((nRIndexFinish - nRIndexStart) == 2) && ((nTIndexFinish - nTIndexStart) == 2))
+				dblDivisorFactor = 0.25;    // This is, by far, the most likely case
+			else if (((nRIndexFinish - nRIndexStart) == 2) || ((nTIndexFinish - nTIndexStart) == 2))
+				dblDivisorFactor = 0.5;
+			else
+				dblDivisorFactor = 1.0;
 
-				if (bLog)
-				{
-					String sMsg = String.format("%n  nRun = %d, nRIndex = %d, nTIndex = %d: dmRicci has elements:%n%s .%n",
-					nRun, nRIndex, nTIndex, dmRicci.toString());
-					m_logger.info(sMsg);
-				}
-
-				double dblSumOfSquaresOfRicciTensors = 0.0;
-
-				for (int j = 0; j < dmRicci.rows(); j++)
-				{
-					double dblRicciTensor = dmRicci.get(j, 0);
-					dblSumOfSquaresOfRicciTensors += dblRicciTensor * dblRicciTensor;
-				}
-
-				final int nTIndexStart;
-				final int nTIndexFinish;
-				if (nTIndex == 0)
-				{
-					nTIndexStart = nTIndex;        // Forward difference for the first point
-					nTIndexFinish = nTIndexStart + 1;
-				}
-				else if (nTIndex < nTimeElements - 1)
-				{
-					nTIndexStart = nTIndex - 1;    // Central difference for an internal point
-					nTIndexFinish = nTIndexStart + 2;
-				}
-				else
-				{
-					nTIndexStart = nTIndex - 1;    // Backward difference for the last point
-					nTIndexFinish = nTIndexStart + 1;
-				}
-
-				double dblRStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   R, A).getKey()
-				 .doubleValue();
-				double dblTStart  = Worker.getMetricComponent(madG, None, nRIndexStart, nTIndexStart,   T, A).getKey()
-				 .doubleValue();
-				double dblRFinish = Worker.getMetricComponent(madG, None, nRIndexFinish, nTIndexFinish, R, A).getKey()
-				 .doubleValue();
-				double dblTFinish = Worker.getMetricComponent(madG, None, nRIndexFinish, nTIndexFinish, T, A).getKey()
-				 .doubleValue();
-
-				// Add to the all-squares total with an appropriate weighting
-				dblSumOfSquaresOfRicciTensorsOverAllRAndT += dblSumOfSquaresOfRicciTensors
-				 * ((dblRFinish - dblRStart) * (dblTFinish - dblTStart))
-				 / ((nRIndexFinish - nRIndexStart) * (nTIndexFinish - nTIndexStart));
-			}
+			// Add to the all-squares total with an appropriate weighting
+			dblSumOfSquaresOfRicciTensorsOverAllT += dblSumOfSquaresOfRicciTensors
+			 * (dblRFinish - dblRStart) * (dblTFinish - dblTStart) * dblDivisorFactor;
 		}
 
-		return dblSumOfSquaresOfRicciTensorsOverAllRAndT;
+		return dblSumOfSquaresOfRicciTensorsOverAllT;
 	}
 
 	/**
@@ -187,8 +227,8 @@ public class SimulatedAnnealing
 
 		for (int i = 0; i < nSizeVarying; i++)
 		{
-			int nRIndex = -1;
-			int nTIndex = -1;
+			int nRIndex;
+			int nTIndex;
 			switch (mp)
 			{
 				case R:
@@ -199,6 +239,8 @@ public class SimulatedAnnealing
 					nRIndex = nIndexFixed;
 					nTIndex = i;
 					break;
+				default:
+					throw new RuntimeException(String.format("Invalid metric position \"%s\".", mp.toString()));
 			}
 
 			double dblExponent = (i - nIndexCentre) / dblStandardDeviation;

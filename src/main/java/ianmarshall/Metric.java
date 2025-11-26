@@ -1,5 +1,8 @@
 package ianmarshall;
 
+import java.util.function.IntConsumer;
+import java.util.stream.IntStream;
+
 /**
  * This class represents all the elements of the metric or fundamental tensor at all the points in space-time
  * under consideration.
@@ -24,13 +27,18 @@ public class Metric
 		m_nTimeElements = adblTimes.length;
 		m_aMetricComponents = new MetricComponents[m_nRadiusElements][m_nTimeElements];
 
-		for (int r = 0; r < m_nRadiusElements; r++)
+		IntStream.range(0, m_nRadiusElements).parallel().forEach(new IntConsumer()
 		{
-			double dblRadius = adblRadii[r].doubleValue();
+			@Override
+			public void accept(int nRIndex)
+			{
+				double dblRadius = adblRadii[nRIndex].doubleValue();
 
-			for (int t = 0; t < m_nTimeElements; t++)
-				m_aMetricComponents[r][t] = new MetricComponents(dblRadius, adblTimes[t].doubleValue(), 0.0, 0.0, 0.0, 0.0);
-		}
+				for (int nTIndex = 0; nTIndex < m_nTimeElements; nTIndex++)
+					m_aMetricComponents[nRIndex][nTIndex] = new MetricComponents(dblRadius, adblTimes[nTIndex].doubleValue(),
+					 0.0, 0.0, 0.0, 0.0);
+			}
+		});
 	}
 
 	private Metric(int nRadiusElements, int nTimeElements, MetricComponents[][] aMetricComponents)
@@ -39,9 +47,15 @@ public class Metric
 		m_nTimeElements = nTimeElements;
 		m_aMetricComponents = new MetricComponents[m_nRadiusElements][m_nTimeElements];
 
-		for (int r = 0; r < m_nRadiusElements; r++)
-			for (int t = 0; t < m_nTimeElements; t++)
-				m_aMetricComponents[r][t] = aMetricComponents[r][t].copy();
+		IntStream.range(0, m_nRadiusElements).parallel().forEach(new IntConsumer()
+		{
+			@Override
+			public void accept(int nRIndex)
+			{
+				for (int nTIndex = 0; nTIndex < m_nTimeElements; nTIndex++)
+					m_aMetricComponents[nRIndex][nTIndex] = aMetricComponents[nRIndex][nTIndex].copy();
+			}
+		});
 	}
 
 	public MetricComponents getMetricComponents(int nRIndex, int nTIndex)
