@@ -34,6 +34,8 @@ public class SimulatedAnnealing
 	private static final MetricPosition[] m_ampMetricPositions = MetricPosition.values();
 	private static final MetricComponent[] m_amcMetricComponents = MetricComponent.values();
 
+	private static int m_nProcessors = 0;
+
 	private double m_dblNeighbourPeakScalingFactor = 0.0;
 	private double m_dblAcceptanceProbabilityScalingFactor = 0.0;
 	private double m_dblTemperatureScalingFactor = 0.0;
@@ -42,6 +44,9 @@ public class SimulatedAnnealing
 
 	public SimulatedAnnealing(StartParameters spStartParameters)
 	{
+		if (m_nProcessors == 0)
+			m_nProcessors = Runtime.getRuntime().availableProcessors();
+
 		m_dblNeighbourPeakScalingFactor = spStartParameters.getNeighbourPeakScalingFactor();
 		m_dblAcceptanceProbabilityScalingFactor = spStartParameters.getAcceptanceProbabilityScalingFactor();
 		m_dblTemperatureScalingFactor = spStartParameters.getTemperatureScalingFactor();
@@ -64,16 +69,24 @@ public class SimulatedAnnealing
 	{
 		int nRadiusElements = madG.getNRadiusElements();
 		int nTimeElements   = madG.getNTimeElements();
+		int nChunkSize = 1 + ((nRadiusElements - 1) / m_nProcessors);
 
-		double dblSumOfSquaresOfRicciTensorsOverAllRAndT = IntStream.range(0, nRadiusElements).parallel().mapToDouble(
+		double dblSumOfSquaresOfRicciTensorsOverAllRAndT = IntStream.range(0, m_nProcessors).parallel().mapToDouble(
 		 new IntToDoubleFunction()
+		{
+			@Override
+			public double applyAsDouble(int nChunk)
 			{
-					@Override
-					public double applyAsDouble(int nRIndex)
-					{
-						return calculateContributionForRadius(madG, nRun, nRadiusElements, nTimeElements, nRIndex);
-					}
+				double dblSum = 0.0;
+				int nRIndexStart = nChunk * nChunkSize;
+				int nRIndexFinish = Math.min(nRIndexStart + nChunkSize - 1, nRadiusElements - 1);
+
+				for (int nRIndex = nRIndexStart; nRIndex <= nRIndexFinish; nRIndex++)
+					dblSum += calculateContributionForRadius(madG, nRun, nRadiusElements, nTimeElements, nRIndex);
+
+				return dblSum;
 			}
+		}
 		 ).sum();
 
 		return dblSumOfSquaresOfRicciTensorsOverAllRAndT;

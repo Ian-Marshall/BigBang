@@ -52,6 +52,9 @@ public class Worker implements Runnable
 //private static final double DBL_SUCCESS_LOG_PROBABILITY = 0.001;
 	private static final Logger s_logger = LoggerFactory.getLogger(Worker.class);
 	private static final StringBuilder s_sbMoveLog = new StringBuilder();    // Refactor this for multi-instance use
+
+	private static int m_nProcessors = 0;
+
 	private int m_nRun = 0;
 	private int m_nRuns = 0;
 
@@ -82,6 +85,9 @@ public class Worker implements Runnable
 	 */
 	public Worker(StartParameters spStartParameters, int nRun, MetricAndDerivatives madG)
 	{
+		if (m_nProcessors == 0)
+			m_nProcessors = Runtime.getRuntime().availableProcessors();
+
 		m_nRun = nRun;
 		m_nRuns = spStartParameters.getNumberOfRuns();
 		m_madG = madG;
@@ -314,6 +320,7 @@ public class Worker implements Runnable
 		final MetricComponent[] amcMetricComponents = MetricComponent.values();
 		int nRadiusElements = madG.getNRadiusElements();
 		int nTimeElements   = madG.getNTimeElements();
+		int nChunkSize = 1 + ((nRadiusElements - 1) / m_nProcessors);
 
 		for (DerivativeLevel dlDerivativeLevel: DerivativeLevel.values())
 			if (dlDerivativeLevel != None)
@@ -339,14 +346,18 @@ public class Worker implements Runnable
 				DerivativeLevel dlGetting = gettingDerivativeLevel(dlDerivativeLevel, mpVarying);
 
 				for (MetricComponent mcMetricComponent: amcMetricComponents)
-					IntStream.range(0, nRadiusElements).parallel().forEach(new IntConsumer()
+					IntStream.range(0, m_nProcessors).parallel().forEach(new IntConsumer()
 					{
 						@Override
-						public void accept(int nRIndex)
+						public void accept(int nChunk)
 						{
-							for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
-								calculateDifferentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
-								 mcMetricComponent, dlGetting);
+							int nRIndexStart = nChunk * nChunkSize;
+							int nRIndexFinish = Math.min(nRIndexStart + nChunkSize - 1, nRadiusElements - 1);
+
+							for (int nRIndex = nRIndexStart; nRIndex <= nRIndexFinish; nRIndex++)
+								for (int nTIndex = 0; nTIndex < nTimeElements; nTIndex++)
+									calculateDifferentialOfMetricComponent(madG, dlDerivativeLevel, nRIndex, nTIndex, mpVarying,
+									 mcMetricComponent, dlGetting);
 						}
 					});
 			}

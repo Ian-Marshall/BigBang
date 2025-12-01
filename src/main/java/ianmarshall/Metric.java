@@ -9,6 +9,7 @@ import java.util.stream.IntStream;
  */
 public class Metric
 {
+	private static int m_nProcessors = 0;
 	private final int m_nRadiusElements;
 	private final int m_nTimeElements;
 	private final MetricComponents[][] m_aMetricComponents;    // 1st dimension: radius; 2nd dimension: time
@@ -23,37 +24,55 @@ public class Metric
 	 */
 	public Metric(Double[] adblRadii, Double[] adblTimes)
 	{
+		if (m_nProcessors == 0)
+			m_nProcessors = Runtime.getRuntime().availableProcessors();
+
 		m_nRadiusElements = adblRadii.length;
 		m_nTimeElements = adblTimes.length;
 		m_aMetricComponents = new MetricComponents[m_nRadiusElements][m_nTimeElements];
+		int nChunkSize = 1 + ((m_nRadiusElements - 1) / m_nProcessors);
 
-		IntStream.range(0, m_nRadiusElements).parallel().forEach(new IntConsumer()
+		IntStream.range(0, m_nProcessors).parallel().forEach(new IntConsumer()
 		{
 			@Override
-			public void accept(int nRIndex)
+			public void accept(int nChunk)
 			{
-				double dblRadius = adblRadii[nRIndex].doubleValue();
+				int nRIndexStart = nChunk * nChunkSize;
+				int nRIndexFinish = Math.min(nRIndexStart + nChunkSize - 1, m_nRadiusElements - 1);
 
-				for (int nTIndex = 0; nTIndex < m_nTimeElements; nTIndex++)
-					m_aMetricComponents[nRIndex][nTIndex] = new MetricComponents(dblRadius, adblTimes[nTIndex].doubleValue(),
-					 0.0, 0.0, 0.0, 0.0);
+				for (int nRIndex = nRIndexStart; nRIndex <= nRIndexFinish; nRIndex++)
+				{
+					double dblRadius = adblRadii[nRIndex].doubleValue();
+
+					for (int nTIndex = 0; nTIndex < m_nTimeElements; nTIndex++)
+						m_aMetricComponents[nRIndex][nTIndex] = new MetricComponents(dblRadius, adblTimes[nTIndex].doubleValue(),
+						 0.0, 0.0, 0.0, 0.0);
+				}
 			}
 		});
 	}
 
 	private Metric(int nRadiusElements, int nTimeElements, MetricComponents[][] aMetricComponents)
 	{
+		if (m_nProcessors == 0)
+			m_nProcessors = Runtime.getRuntime().availableProcessors();
+
 		m_nRadiusElements = nRadiusElements;
 		m_nTimeElements = nTimeElements;
 		m_aMetricComponents = new MetricComponents[m_nRadiusElements][m_nTimeElements];
+		int nChunkSize = 1 + ((m_nRadiusElements - 1) / m_nProcessors);
 
-		IntStream.range(0, m_nRadiusElements).parallel().forEach(new IntConsumer()
+		IntStream.range(0, m_nProcessors).parallel().forEach(new IntConsumer()
 		{
 			@Override
-			public void accept(int nRIndex)
+			public void accept(int nChunk)
 			{
-				for (int nTIndex = 0; nTIndex < m_nTimeElements; nTIndex++)
-					m_aMetricComponents[nRIndex][nTIndex] = aMetricComponents[nRIndex][nTIndex].copy();
+				int nRIndexStart = nChunk * nChunkSize;
+				int nRIndexFinish = Math.min(nRIndexStart + nChunkSize - 1, m_nRadiusElements - 1);
+
+				for (int nRIndex = nRIndexStart; nRIndex <= nRIndexFinish; nRIndex++)
+					for (int nTIndex = 0; nTIndex < m_nTimeElements; nTIndex++)
+						m_aMetricComponents[nRIndex][nTIndex] = aMetricComponents[nRIndex][nTIndex].copy();
 			}
 		});
 	}
